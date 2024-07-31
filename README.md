@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./images/laplax_logo.png" alt="Laplax Logo" style="max-width: 100%; height: auto;"/>
+</p>
+
 # laplax
 
 ## What is `laplax`?
@@ -15,4 +19,4 @@ Our development is guided by the following principles:
 - **PyTree-Centric Structure:** Internally, the package is structured around PyTrees. This design choice allows us to defer materialization until necessary, optimizing performance and memory usage.
 
 ## Roadmap and Contributions
-We are developing this package in public, and discussions about the roadmap and feature priorities are structured in the [Issues](https://github.com/bmucsanyi/laplax/issues) section. If you're interested in contributing or want to see what's planned for the future, please check the [Issues](https://github.com/bmucsanyi/laplax/issues).
+We are developing this package in public, and discussions about the roadmap and feature priorities are structured in the [Issues](https://github.com/bmucsanyi/laplax/issues) section. If you're interested in contributing or want to see what's planned for the future, please check them out.
