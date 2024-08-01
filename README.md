@@ -1,6 +1,6 @@
-<p align="center">
-  <img src="./images/laplax_logo.png" alt="Laplax Logo" style="max-width: 100%; height: auto;"/>
-</p>
+<div align="center">
+  <img src="./images/laplax_logo.png" alt="Laplax Logo"/>
+</div>
 
 # Laplax
 
