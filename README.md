@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./images/laplax_logo.svg" alt="Laplax Logo"/>
+  <img src="./images/laplax_logo.svg" width="541" height= "auto" alt="Laplax Logo"/>
 </p>
 
 # Laplax
