@@ -3,8 +3,6 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from laplax.types import CalibrationErrorNorm
-
 # --------------------------------------------------------------------------------
 # Classification metrics
 # --------------------------------------------------------------------------------
@@ -178,38 +176,3 @@ def nll_gaussian(  # noqa: D417
 # --------------------------------------------------------------------------------
 # General calibration interface
 # --------------------------------------------------------------------------------
-
-
-def calibration_error(
-    confidence: jax.Array,
-    correctness: jax.Array,
-    num_bins: int,
-    norm: CalibrationErrorNorm,
-) -> jax.Array:
-    """Compute the expected/maximum calibration error.
-
-    Args:
-    ----
-        confidence: Float tensor of shape (n,) containing predicted confidences.
-        correctness: Float tensor of shape (n,) containing the true correctness
-            labels.
-        num_bins: Number of equally sized bins.
-        norm: Whether to return ECE (L1 norm) or MCE (inf norm)
-
-    Returns:
-    -------
-        The ECE/MCE.
-
-    """
-    bin_proportions, bin_confidences, bin_accuracies = calculate_bin_metrics(
-        confidence, correctness, num_bins
-    )
-
-    abs_diffs = jnp.abs(bin_accuracies - bin_confidences)
-
-    if norm == CalibrationErrorNorm.L1:
-        score = (bin_proportions * abs_diffs).sum()
-    else:
-        score = abs_diffs.max()
-
-    return score
