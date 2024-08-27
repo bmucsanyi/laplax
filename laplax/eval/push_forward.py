@@ -14,7 +14,7 @@ from jaxtyping import PyTree
 
 
 def create_mc_predictions_for_data_point_fn(model_fn, mean, cov_scale, param_builder):  # noqa: ANN001, ANN201, D103
-    rng_key = jax.random.PRNGKey(42)
+    rng_key, _ = jax.random.PRNGKey(42)
     samples = random.multivariate_normal(rng_key, mean, cov_scale, (1000,))
 
     def get_predictions_for_data_point(data_point: jax.Array):  # noqa: ANN202
