@@ -152,6 +152,16 @@ ignore = [
     # Assignments before return can emphasize the code's semantic structure
     "RET504",
     "S403",
+    # Currently set some simplifications
+    "ERA001", # no-commented out code
+    "D102", # no docstrings
+    "ANN401", # no type hints
+    "ANN202", # no type hints
+    "ANN001", # no type hints
+    "ANN003", # no type hints
+    "ANN201", # no type hints
+    "D103", # no docstrings
+    "TD003", #Found TODO in code
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]

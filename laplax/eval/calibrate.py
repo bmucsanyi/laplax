@@ -1,43 +1,36 @@
 # noqa: D100
-import argparse
 import time
 from collections.abc import Callable
-from functools import partial
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from laplax.eval.utils import compute_calibration_metric, get_calibration_evaluation_fn
-from laplax.types import CalibrationMetric, Params
+from laplax.eval.metrics import estimate_q
 
 
-def get_calibration_objective_fn(  # noqa: D103
-    args: argparse.Namespace,
-    model_fn: Callable,
-    params: Params,
-    get_cov: Callable[[float], jax.Array],
-    metric: CalibrationMetric,
-) -> Callable[[float, tuple[jax.Array, jax.Array]], float]:
-    def evaluate_for_given_prior_prec(
-        prior_prec: float, data: tuple[jax.Array, jax.Array]
-    ) -> float:
-        cov = get_cov(prior_prec)
-
-        evaluate_dataset = get_calibration_evaluation_fn(
-            args=args,
-            model_fn=model_fn,
-            params=params,
-            cov=cov,
-            compute_metrics=partial(compute_calibration_metric, metric=metric),
-        )
-
-        return evaluate_dataset(data)
-
-    return evaluate_for_given_prior_prec
+# Calibrate prior
+def calibration_metric(**predictions):
+    return jnp.abs(estimate_q(**predictions) - 1)
 
 
-def grid_search(  # noqa: D103
+def evaluate_for_given_prior_prec(
+    prior_prec: float,
+    data,
+    get_cov_scale=Callable,
+    set_prob_predictive=Callable,
+    metric=calibration_metric,
+):
+    prob_predictive = set_prob_predictive(cov_scale=get_cov_scale(prior_prec))
+
+    def evaluate_data(input, target):
+        return {**prob_predictive(input), "target": target}
+
+    res = metric(**jax.vmap(evaluate_data)(data[0], data[1]))
+    return res
+
+
+def grid_search(
     prior_prec_interval: jax.Array,
     objective: Callable[[float, tuple[jax.Array, jax.Array]], float],
     data: tuple[jax.Array, jax.Array],
@@ -50,7 +43,7 @@ def grid_search(  # noqa: D103
         except ValueError as error:
             print(f"Caught an exception in validate: {error}")  # noqa: T201
             result = float("inf")
-        if jnp.isnan(result):  # TODO(2bys): Check if we want this.  # noqa: TD003
+        if jnp.isnan(result):  # TODO(2bys): Check if we want this.
             print("Caught nan, setting result to inf.")  # noqa: T201
             result = float("inf")
         print(  # noqa: T201
@@ -67,7 +60,7 @@ def grid_search(  # noqa: D103
     return best_prior_prec
 
 
-def optimize_prior_prec(  # noqa: D103
+def optimize_prior_prec(
     objective: Callable[[float, tuple[jax.Array, jax.Array]], float],
     data: tuple[jax.Array, jax.Array],
     log_prior_prec_min: float = -3.0,

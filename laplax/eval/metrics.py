@@ -47,13 +47,13 @@ def accuracy(
     ]
 
 
-def cross_entropy(prob_p: jax.Array, prob_q: jax.Array, axis: int = -1) -> jax.Array:  # noqa: D103
+def cross_entropy(prob_p: jax.Array, prob_q: jax.Array, axis: int = -1) -> jax.Array:
     p_log_q = jax.scipy.special.xlogy(prob_p, prob_q)
 
     return -p_log_q.sum(axis=axis)
 
 
-def multiclass_brier(prob: jax.Array, target: jax.Array) -> jax.Array:  # noqa: D103
+def multiclass_brier(prob: jax.Array, target: jax.Array) -> jax.Array:
     if target.ndim == 1:
         target = jax.nn.one_hot(target, num_classes=prob.shape[-1])
 
@@ -112,21 +112,19 @@ def calculate_bin_metrics(
 # --------------------------------------------------------------------------------
 
 # REGRESSION METRICS
-import jax.numpy as jnp
 
 
 def estimate_q(
     pred_mean: jnp.ndarray,
     pred_std: jnp.ndarray,
     target: jnp.ndarray,
-    **kwargs,  # noqa: ANN003, ARG001
+    **kwargs,  # noqa: ARG001
 ) -> float:
     """Estimate the q value."""
     return jnp.mean(jnp.power(pred_mean - target, 2) / jnp.power(pred_std, 2))
-    return jnp.mean(jnp.power(pred_mean - target, 2) / jnp.power(pred_std, 2))
 
 
-def estimate_rmse(pred_mean: jax.Array, target: jax.Array, **kwargs) -> float:  # noqa: ANN003, ARG001
+def estimate_rmse(pred_mean: jax.Array, target: jax.Array, **kwargs) -> float:  # noqa: ARG001
     """Estimate the RMSE."""
     return jnp.sqrt(jnp.mean(jnp.power(pred_mean - target, 2)))
 
@@ -136,7 +134,7 @@ def nll_gaussian(  # noqa: D417
     pred_std: jnp.ndarray,
     target: jnp.ndarray,
     scaled: bool = True,  # noqa: FBT001, FBT002
-    **kwargs,  # noqa: ANN003, ARG001
+    **kwargs,  # noqa: ARG001
 ) -> float:
     """Negative log likelihood for a Gaussian distribution in JAX.
 
@@ -145,9 +143,11 @@ def nll_gaussian(  # noqa: D417
 
     Args:
         pred: 1D array of the predicted means for the held out dataset.
-        pred_std: 1D array of the predicted standard deviations for the held out dataset.
+        pred_std: 1D array of the predicted standard deviations for the held out
+            dataset.
         target: 1D array of the true labels in the held out dataset.
-        scaled: Whether to scale the negative log likelihood by the size of the held out set.
+        scaled: Whether to scale the negative log likelihood by the size
+            of the held out set.
 
     Returns:
         The negative log likelihood for the held out set.

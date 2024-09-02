@@ -6,11 +6,11 @@ from jax import random
 
 
 # Function to create the sinusoid dataset
-def get_sinusoid_example(  # noqa: D103
+def get_sinusoid_example(
     n_data: int = 150,
     sigma_noise: float = 0.3,
     batch_size: int = 150,
-    rng_key=None,  # noqa: ANN001
+    rng_key=None,
 ) -> tuple[
     jnp.ndarray, jnp.ndarray, Iterator[tuple[jnp.ndarray, jnp.ndarray]], jnp.ndarray
 ]:
@@ -39,7 +39,7 @@ def get_sinusoid_example(  # noqa: D103
     y_train = jnp.sin(X_train) + noise
 
     # Create a simple data loader function (generator)
-    def _data_loader(X, y, batch_size):  # noqa: ANN001, ANN202
+    def _data_loader(X, y, batch_size):
         dataset_size = X.shape[0]
         indices = np.arange(dataset_size)
         np.random.shuffle(indices)  # noqa: NPY002

@@ -5,7 +5,7 @@ from typing import Any
 import jax
 
 
-def get_predictions_for_data_point_fn():  # noqa: ANN201, D103
+def get_predictions_for_data_point_fn():
     def get_predictions_for_data_point(
         x: jax.Array,  # noqa: ARG001
     ) -> tuple[jax.Array, jax.Array]:
@@ -14,30 +14,20 @@ def get_predictions_for_data_point_fn():  # noqa: ANN201, D103
     return get_predictions_for_data_point
 
 
-def get_evaluation_fn():  # noqa: ANN201, D103
-    def evaluate_dataset(data: tuple[jax.Array, jax.Array]) -> float:  # noqa: ARG001
-        return
-
-    return evaluate_dataset
-
-
-def get_calibration_evaluation_fn():  # noqa: ANN201, D103
-    def evaluate_dataset(data: tuple[jax.Array, jax.Array]) -> float:  # noqa: ARG001
-        return
-
-    return evaluate_dataset
-
-
-def log_metrics():  # noqa: ANN201, D103
-    return ...
-
-
-def _aslist(obj: Any) -> list[Any]:  # noqa: ANN401
+def _aslist(obj: Any) -> list[Any]:
     return obj if isinstance(obj, list) else [obj]
 
 
-def evaluate_metrics_on_dataset(
-    pred_fn: Callable, data: tuple[jax.Array], *, metrics: list[Callable] | Callable
+def identity(x: Any) -> Any:
+    return x
+
+
+def evaluate_metrics_on_dataset(  # noqa: D417
+    pred_fn: Callable,
+    data: tuple[jax.Array],
+    *,
+    metrics: list[Callable] | Callable,
+    apply: Callable = identity,
 ) -> dict:
     """Evaluate metrics on a dataset.
 
@@ -51,10 +41,9 @@ def evaluate_metrics_on_dataset(
 
     """
 
-    def evaluate_data_point(x: tuple[jax.Array]) -> dict:
-        return {**pred_fn(x[0]), "target": x[1]}
+    def evaluate_data_point(dp: tuple[jax.Array]) -> dict:
+        pred = {**pred_fn(dp[0]), "target": dp[1]}
+        return {metric.__name__: metric(**pred) for metric in _aslist(metrics)}
 
-    return {
-        metric.__name__: jax.vmap(lambda d: metric(**evaluate_data_point(d)))(data)  # noqa: B023
-        for metric in _aslist(metrics)
-    }
+    evaluated_metrics = jax.vmap(evaluate_data_point)(data)
+    return {metric: apply(evaluated_metrics[metric]) for metric in evaluated_metrics}

@@ -1,6 +1,6 @@
 # noqa: D100
-# import jax # noqa: ERA001
-# from typing import Callable, Tuple  # noqa: ERA001
+# import jax
+# from typing import Callable, Tuple
 
 # def get_laplace(
 #         model_fn: Callable,
@@ -19,4 +19,4 @@
 #     """
 
 
-#     return get_cov_scale # noqa: ERA001
+#     return get_cov_scale

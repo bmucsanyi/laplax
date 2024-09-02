@@ -41,7 +41,7 @@ def flatten_hessian(hessian_pytree: PyTree, params_pytree: PyTree) -> jax.Array:
     return full_hessian
 
 
-def estimate_hessian(fn: callable, params, data):  # noqa: ANN001, ANN201
+def estimate_hessian(fn: callable, params, data):
     """Estimate the Hessian of a function at a given point.
 
     Args:
@@ -61,7 +61,7 @@ def estimate_hessian(fn: callable, params, data):  # noqa: ANN001, ANN201
     return hessian
 
 
-def cov_scale_full_hessian(hessian: jax.Array, scaling, prior) -> jax.Array:  # noqa: ANN001, D417
+def cov_scale_full_hessian(hessian: jax.Array, scaling, prior) -> jax.Array:  # noqa: D417
     """Scale the full Hessian by a given scale.
 
     Args:
