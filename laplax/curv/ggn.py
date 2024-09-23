@@ -11,10 +11,7 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from laplax.curv.util import (
-    flatten_pytree,
-    get_inflate_pytree_fn,
-)
+from laplax.curv.util import flatten_pytree, get_inflate_pytree_fn
 
 
 def flatten_model_jacobian(jacobian_tree: Any) -> jax.Array:
@@ -147,3 +144,6 @@ class GGN:
         # # Hidden dim: 32: 10 sec of calibration round.
         # # Hidden dim: 64: 30 sec of calibration round.
         return res if not flatten else res[..., :, 0]
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return self.__matmul__(x)
