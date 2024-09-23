@@ -23,10 +23,12 @@ import jax.numpy as jnp
 # --------------------------------------------------------------------
 
 
-def set_prob_predictive_with_input_perturbations(model, cov_scale, input_shape):
-    rng = jax.random.PRNGKey(0)
-    n_weight_samples = 10
-    # input_shape = (256, 20) # ...
+def set_prob_predictive_with_input_perturbations(
+    model, cov_scale, input_shape, **kwargs
+):
+    rng = kwargs.get("rng", jax.random.PRNGKey(0))
+    n_weight_samples = kwargs.get("n_weight_samples", 100)
+    mode = kwargs.get("mode", "metric")
     mc_samples = cov_scale * jax.random.normal(rng, (n_weight_samples, *input_shape))
 
     def get_prob_predictive(x):
@@ -36,7 +38,7 @@ def set_prob_predictive_with_input_perturbations(model, cov_scale, input_shape):
             "pred": pred,
             "pred_mean": jax.numpy.mean(pred_ensemble, axis=0),
             "pred_std": jax.numpy.std(pred_ensemble, axis=0),
-            # "ensemble": pred_ensemble,
+            "pred_ensemble": pred_ensemble if mode == "ensemble" else None,
         }
 
     return get_prob_predictive
@@ -82,11 +84,13 @@ def set_prob_predictive_with_weight_perturbations(  # noqa: PLR0913, PLR0917
     param_shapes: list[tuple],
     param_access: Callable,
     param_set: Callable,
-    n_weight_samples: int = 10,
-    rng: jax.random.PRNGKey = jax.random.PRNGKey(0),  # noqa: B008
+    **kwargs,
 ):
     """Return prob-predictions for weight perturbations."""
-    keys = jax.random.split(rng, len(param_shapes))
+    rng = kwargs.get("rng", jax.random.PRNGKey(0))
+    n_weight_samples = kwargs.get("n_weight_samples", 100)
+    mode = kwargs.get("mode", "metric")
+    keys = jax.random.split(rng, n_weight_samples)
     mc_samples = [
         cov_scale * jax.random.normal(key, (n_weight_samples, *shape))
         for key, shape in zip(keys, param_shapes, strict=False)
@@ -114,7 +118,7 @@ def set_prob_predictive_with_weight_perturbations(  # noqa: PLR0913, PLR0917
             "pred": pred,
             "pred_mean": jax.numpy.mean(pred_ensemble, axis=0),
             "pred_std": jax.numpy.std(pred_ensemble, axis=0),
-            # "pred_ensemble": pred_ensemble
+            "pred_ensemble": pred_ensemble if mode == "ensemble" else None,
         }
 
     return get_prob_predictions
