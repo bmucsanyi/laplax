@@ -4,6 +4,8 @@ from typing import Any
 
 import jax
 
+from laplax.config import lmap
+
 
 def get_predictions_for_data_point_fn():
     def get_predictions_for_data_point(
@@ -45,5 +47,6 @@ def evaluate_metrics_on_dataset(  # noqa: D417
         pred = {**pred_fn(dp[0]), "target": dp[1]}
         return {metric.__name__: metric(**pred) for metric in _aslist(metrics)}
 
-    evaluated_metrics = jax.vmap(evaluate_data_point)(data)
+    # evaluated_metrics = jax.vmap(evaluate_data_point)(data)
+    evaluated_metrics = lmap(evaluate_data_point, data)
     return {metric: apply(evaluated_metrics[metric]) for metric in evaluated_metrics}

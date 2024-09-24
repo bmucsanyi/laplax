@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from laplax.config import lmap
 from laplax.eval.metrics import estimate_q
 
 
@@ -23,10 +24,12 @@ def evaluate_for_given_prior_prec(
 ):
     prob_predictive = set_prob_predictive(cov_scale=get_cov_scale(prior_prec))
 
-    def evaluate_data(input, target):
+    def evaluate_data(dp):
+        input, target = dp
         return {**prob_predictive(input), "target": target}
 
-    res = metric(**jax.vmap(evaluate_data)(data[0], data[1]))
+    #    res = metric(**jax.vmap(evaluate_data)(data[0], data[1]))
+    res = metric(**lmap(evaluate_data, (data[0], data[1])))  # noqa: B905
     return res
 
 

@@ -8,6 +8,8 @@ import jax
 from jax import random
 from jaxtyping import PyTree
 
+from laplax.config import lmap
+
 # --------------------------------------------------------------------------------
 # Monte Carlo predictions
 # --------------------------------------------------------------------------------
@@ -21,7 +23,8 @@ def create_mc_predictions_for_data_point_fn(model_fn, mean, cov_scale, param_bui
         def pred_fn(p: PyTree) -> jax.Array:
             return model_fn(param_builder(p), data_point)
 
-        la_pred = jax.vmap(pred_fn)(samples)
+        la_pred = lmap(pred_fn, samples)
+        # jax.vmap(pred_fn)(samples)
         model_pred = pred_fn(mean)
         return {
             "pred": model_pred,

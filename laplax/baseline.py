@@ -18,6 +18,8 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
+from laplax.config import lmap
+
 # --------------------------------------------------------------------
 # BASELINE: Input perturbations
 # --------------------------------------------------------------------
@@ -33,7 +35,7 @@ def set_prob_predictive_with_input_perturbations(
 
     def get_prob_predictive(x):
         pred = model(x)
-        pred_ensemble = jax.vmap(model)(x[None] + mc_samples)
+        pred_ensemble = lmap(model, x[None] + mc_samples)
         return {
             "pred": pred,
             "pred_mean": jax.numpy.mean(pred_ensemble, axis=0),
