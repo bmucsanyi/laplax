@@ -121,11 +121,23 @@ def estimate_q(
     **kwargs,  # noqa: ARG001
 ) -> float:
     """Estimate the q value."""
+    # Flatten arrays if `flatten` is True
+    if kwargs.get("flatten", False):
+        pred_mean = pred_mean.flatten()
+        pred_std = pred_std.flatten()
+        target = target.flatten()
+
     return jnp.mean(jnp.power(pred_mean - target, 2) / jnp.power(pred_std, 2))
 
 
 def estimate_rmse(pred_mean: jax.Array, target: jax.Array, **kwargs) -> float:  # noqa: ARG001
     """Estimate the RMSE."""
+    # Flatten arrays if `flatten` is True
+    if kwargs.get("flatten", False):
+        pred_mean = pred_mean.flatten()
+        target = target.flatten()
+
+
     return jnp.sqrt(jnp.mean(jnp.power(pred_mean - target, 2)))
 
 
@@ -177,8 +189,3 @@ def nll_gaussian(  # noqa: D417
         nll /= len(nll_list)
 
     return nll
-
-
-# --------------------------------------------------------------------------------
-# General calibration interface
-# --------------------------------------------------------------------------------

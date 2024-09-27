@@ -6,13 +6,13 @@ This does not support pytree structures.
 import operator
 from collections.abc import Callable
 from functools import partial
-from typing import Any
+from typing import Any, Optional
 
 import jax
 import jax.numpy as jnp
 
 from laplax.curv.util import flatten_pytree, get_inflate_pytree_fn
-
+from laplax.config import laplax_dtype
 
 def flatten_model_jacobian(jacobian_tree: Any) -> jax.Array:
     """Flatten the model Jacobian."""
@@ -42,7 +42,7 @@ class GGN:
         model_fn: Callable,
         params: dict,
         data: tuple[jax.Array, jax.Array],
-        dtype: jnp.dtype = jnp.float32,
+        dtype: Optional[jnp.dtype] | None = None,
     ) -> None:
         self.params_flat, self.tree_def, self.shapes = flatten_pytree(params)
         num_params = self.params_flat.shape[0]
@@ -61,7 +61,7 @@ class GGN:
             lambda p: model_fn(params=p, input=x), params
         )
         self.shape = (num_params, num_params)
-        self.dtype = dtype
+        self.dtype = dtype if dtype else laplax_dtype()
 
     # def astype(self, dtype) -> Self:
     #     self.params = iterate_and_apply(
@@ -146,4 +146,4 @@ class GGN:
         return res if not flatten else res[..., :, 0]
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return self.__matmul__(x)
+        return jnp.asarray(self.__matmul__(jnp.asarray(x, dtype=jnp.float32)), dtype=jnp.float64)
