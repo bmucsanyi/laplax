@@ -22,7 +22,7 @@ def lanczos_averaged_vjp_init(ggn: GGN) -> jax.Array:
     """
     x, _ = ggn.data
     pred, jvp_fun = jax.vjp(lambda p: ggn.model_fn(p, x[0]), ggn.params)
-    return flatten_pytree(jvp_fun(jnp.ones_like(pred, dtype=jnp.float32) / pred.size))[
+    return flatten_pytree(jvp_fun(jnp.ones_like(pred, dtype=ggn.dtype) / pred.size))[
         0
     ]
 

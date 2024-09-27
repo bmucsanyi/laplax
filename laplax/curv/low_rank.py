@@ -78,15 +78,21 @@ def get_low_rank_approx_with_large_eigenvalues(ggn: GGN, maxiter: int = 200):
     if ggn.shape[0] < maxiter * 5:
         # necessary assertion for lobpcg_standard function.
         maxiter = ggn.shape[0] // 5 - 1
+    
+    jax.config.update("jax_enable_x64", True)
     b = jax.random.normal(
         jax.random.PRNGKey(1),
         (ggn.shape[0], maxiter),
-        dtype=jnp.float32,
+        dtype=jnp.float64,
+        #dtype=ggn.dtype,
         # TODO(2bys): Check whether we should also run this in jnp.float64
     )
+    print(b.dtype)
     eigen_sketch, eigen_vec_sketch, _ = lobpcg_standard(ggn, b, m=maxiter)
+    print(eigen_sketch)
     ggn_eigen = {
-        "U": jnp.asarray(eigen_vec_sketch, dtype=b.dtype),
-        "S": jnp.asarray(eigen_sketch, dtype=b.dtype),
+        "U": jnp.asarray(eigen_vec_sketch, dtype=jnp.float32),
+        "S": jnp.asarray(eigen_sketch, dtype=jnp.float32),
     }
+    jax.config.update("jax_enable_x64", False)
     return ggn_eigen
