@@ -26,16 +26,28 @@ from laplax.config import lmap
 
 
 def set_prob_predictive_with_input_perturbations(
-    model, cov_scale, input_shape, **kwargs
+    model, prior_scale, input_shape, **kwargs
 ):
     rng = kwargs.get("rng", jax.random.PRNGKey(0))
     n_weight_samples = kwargs.get("n_weight_samples", 100)
     mode = kwargs.get("mode", "metric")
-    mc_samples = cov_scale * jax.random.normal(rng, (n_weight_samples, *input_shape))
+    # mc_samples = prior_scale * jax.random.normal(rng, (n_weight_samples, *input_shape))
+
+    rng_weights = deepcopy(rng)
+
+    def sample_weights_generator():
+        rng_local = deepcopy(rng_weights)
+        for _ in range(n_weight_samples):
+            rng_local, _ = jax.random.split(rng_local)
+            random_sample = prior_scale * jax.random.normal(rng_local, (*input_shape,))
+            yield random_sample
 
     def get_prob_predictive(x):
         pred = model(x)
-        pred_ensemble = lmap(model, x[None] + mc_samples)
+        # pred_ensemble = lmap(model, x[None] + mc_samples)
+        pred_ensemble = jnp.asarray([
+            model(x + eps) for eps in sample_weights_generator()
+        ])
         return {
             "pred": pred,
             "pred_mean": jax.numpy.mean(pred_ensemble, axis=0),
@@ -81,7 +93,7 @@ def initialize_input_perturbations(model, input_shape):
 
 def set_prob_predictive_with_weight_perturbations(  # noqa: PLR0913, PLR0917
     model_fn: Callable,
-    cov_scale: float,
+    prior_scale: float,
     params: dict,
     param_shapes: list[tuple],
     param_access: Callable,
@@ -94,7 +106,7 @@ def set_prob_predictive_with_weight_perturbations(  # noqa: PLR0913, PLR0917
     mode = kwargs.get("mode", "metric")
     keys = jax.random.split(rng, n_weight_samples)
     mc_samples = [
-        cov_scale * jax.random.normal(key, (n_weight_samples, *shape))
+        prior_scale * jax.random.normal(key, (n_weight_samples, *shape))
         for key, shape in zip(keys, param_shapes, strict=False)
     ]
     params_true = deepcopy(param_access(params))

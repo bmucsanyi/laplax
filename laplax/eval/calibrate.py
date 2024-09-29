@@ -22,7 +22,7 @@ def evaluate_for_given_prior_prec(
     set_prob_predictive=Callable,
     metric=calibration_metric,
 ):
-    prob_predictive = set_prob_predictive(cov_scale=get_cov_scale(prior_prec))
+    prob_predictive = set_prob_predictive(prior_scale=prior_prec)
 
     def evaluate_data(dp):
         input, target = dp

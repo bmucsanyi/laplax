@@ -64,3 +64,16 @@ def get_inflate_pytree_fn(
 
 def identity(x):
     return x
+
+
+def to_diagonal(op: Callable) -> jax.Array:
+    @jax.jit
+    def get_canonical_basis_vector(index):
+        zero_vec = jnp.zeros(op.shape[0], dtype=op.dtype)
+        return zero_vec.at[index].set(1)
+
+    ggn_mul = jax.jit(op.__matmul__)
+    return jnp.stack([
+        ggn_mul(get_canonical_basis_vector(index))[index]
+        for index in range(op.shape[0])
+    ])

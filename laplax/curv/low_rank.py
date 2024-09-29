@@ -24,14 +24,14 @@ def scalar_plus_low_rank_invert(U, S, scalar):
 
 
 def set_prob_predictive_with_low_rank(
-    model_fn, cov_scale, params_flat, inflate_params, low_rank_terms, **kwargs
+    model_fn, prior_scale, params_flat, inflate_params, low_rank_terms, **kwargs
 ):
     rng = jax.random.PRNGKey(0)
     n_weight_samples = 100
     n_params = low_rank_terms["U"].shape[0]
     params_true = deepcopy(params_flat)
     low_rank_mv = scalar_plus_low_rank_invert(
-        U=low_rank_terms["U"], S=low_rank_terms["S"], scalar=cov_scale
+        U=low_rank_terms["U"], S=low_rank_terms["S"], scalar=prior_scale
     )
     weight_samples = (
         params_flat[None]
@@ -41,12 +41,10 @@ def set_prob_predictive_with_low_rank(
 
     def get_prob_predictive(input: jax.Array):
         pred = model_fn(params=inflate_params(params_true), input=input)
-        pred_ensemble = jnp.asarray(
-            [
-                model_fn(params=inflate_params(weight), input=input)
-                for weight in weight_samples
-            ]
-        )
+        pred_ensemble = jnp.asarray([
+            model_fn(params=inflate_params(weight), input=input)
+            for weight in weight_samples
+        ])
         return {
             "pred": pred,
             "pred_mean": jax.numpy.mean(pred_ensemble, axis=0),
@@ -78,13 +76,13 @@ def get_low_rank_approx_with_large_eigenvalues(ggn: GGN, maxiter: int = 200):
     if ggn.shape[0] < maxiter * 5:
         # necessary assertion for lobpcg_standard function.
         maxiter = ggn.shape[0] // 5 - 1
-    
+
     jax.config.update("jax_enable_x64", True)
     b = jax.random.normal(
         jax.random.PRNGKey(1),
         (ggn.shape[0], maxiter),
         dtype=jnp.float64,
-        #dtype=ggn.dtype,
+        # dtype=ggn.dtype,
         # TODO(2bys): Check whether we should also run this in jnp.float64
     )
     print(b.dtype)

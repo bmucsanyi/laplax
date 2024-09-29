@@ -15,9 +15,9 @@ from laplax.config import lmap
 # --------------------------------------------------------------------------------
 
 
-def create_mc_predictions_for_data_point_fn(model_fn, mean, cov_scale, param_builder):
+def create_mc_predictions_for_data_point_fn(model_fn, mean, prior_scale, param_builder):
     rng_key, _ = jax.random.PRNGKey(42)
-    samples = random.multivariate_normal(rng_key, mean, cov_scale, (1000,))
+    samples = random.multivariate_normal(rng_key, mean, prior_scale, (1000,))
 
     def get_predictions_for_data_point(data_point: jax.Array):
         def pred_fn(p: PyTree) -> jax.Array:
