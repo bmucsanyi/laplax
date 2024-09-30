@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from laplax.config import lmap
+from laplax.config import laplax_dtype, lmap
 from laplax.eval.metrics import estimate_q
 
 
@@ -18,7 +18,6 @@ def calibration_metric(**predictions):
 def evaluate_for_given_prior_prec(
     prior_prec: float,
     data,
-    get_cov_scale=Callable,
     set_prob_predictive=Callable,
     metric=calibration_metric,
 ):
@@ -28,8 +27,7 @@ def evaluate_for_given_prior_prec(
         input, target = dp
         return {**prob_predictive(input), "target": target}
 
-    #    res = metric(**jax.vmap(evaluate_data)(data[0], data[1]))
-    res = metric(**lmap(evaluate_data, (data[0], data[1])))  # noqa: B905
+    res = metric(**lmap(evaluate_data, (data[0], data[1])))
     return res
 
 
@@ -71,7 +69,10 @@ def optimize_prior_prec(
     grid_size: int = 100,
 ) -> float:
     prior_prec_interval = jnp.logspace(
-        start=log_prior_prec_min, stop=log_prior_prec_max, num=grid_size
+        start=log_prior_prec_min,
+        stop=log_prior_prec_max,
+        num=grid_size,
+        dtype=laplax_dtype(),
     )
     prior_prec = grid_search(prior_prec_interval, objective, data)
 

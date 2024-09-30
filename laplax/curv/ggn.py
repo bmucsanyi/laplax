@@ -6,7 +6,7 @@ This does not support pytree structures.
 import operator
 from collections.abc import Callable
 from functools import partial
-from typing import Any, Optional
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -41,7 +41,7 @@ class GGN:
     def __init__(  # noqa: D107
         self,
         model_fn: Callable,
-        params: dict,
+        params: list[dict] | list,
         data: tuple[jax.Array, jax.Array],
         dtype: jnp.dtype | None = None,
     ) -> None:
@@ -84,7 +84,6 @@ class GGN:
     def mv_ggn_global(self, x: jax.Array, vec: jax.Array, params: dict) -> Any:
         def body_fn(carry, x_i):
             mv_ggn_ptw_result = self.mv_ggn_ptw(x_i, vec, params)
-
             return jax.tree.map(operator.add, carry, mv_ggn_ptw_result), None
 
         num_samples = x.shape[0]
@@ -133,17 +132,12 @@ class GGN:
             msg = f"expected vec.dtype to be {self.dtype}, got {vec.dtype} instead."
             raise ValueError(msg)
 
-        # # This works for higher dimensions, but it is slower.
-        # # During calibration it is around 4.8 sec.
         res = jax.lax.map(
             self.mv,
             vec.T,
             batch_size=1,
         ).T  # jax.lax.map shares over first axes.
-        # # # Increasing batch_size brings it closer, but for higher dimension
-        # # Batch size 10 is already difficult.
-        # # Hidden dim: 32: 10 sec of calibration round.
-        # # Hidden dim: 64: 30 sec of calibration round.
+
         return res if not flatten else res[..., :, 0]
 
     def __call__(self, x: jax.Array) -> jax.Array:

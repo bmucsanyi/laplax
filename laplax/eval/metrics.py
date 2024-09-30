@@ -118,7 +118,7 @@ def estimate_q(
     pred_mean: jnp.ndarray,
     pred_std: jnp.ndarray,
     target: jnp.ndarray,
-    **kwargs,  # noqa: ARG001
+    **kwargs,
 ) -> float:
     """Estimate the q value."""
     # Flatten arrays if `flatten` is True
@@ -130,13 +130,12 @@ def estimate_q(
     return jnp.mean(jnp.power(pred_mean - target, 2) / jnp.power(pred_std, 2))
 
 
-def estimate_rmse(pred_mean: jax.Array, target: jax.Array, **kwargs) -> float:  # noqa: ARG001
+def estimate_rmse(pred_mean: jax.Array, target: jax.Array, **kwargs) -> float:
     """Estimate the RMSE."""
     # Flatten arrays if `flatten` is True
     if kwargs.get("flatten", False):
         pred_mean = pred_mean.flatten()
         target = target.flatten()
-
 
     return jnp.sqrt(jnp.mean(jnp.power(pred_mean - target, 2)))
 
@@ -146,7 +145,7 @@ def nll_gaussian(  # noqa: D417
     pred_std: jnp.ndarray,
     target: jnp.ndarray,
     scaled: bool = True,  # noqa: FBT001, FBT002
-    **kwargs,  # noqa: ARG001
+    **kwargs,
 ) -> float:
     """Negative log likelihood for a Gaussian distribution in JAX.
 
