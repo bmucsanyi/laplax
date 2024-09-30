@@ -14,6 +14,7 @@ input perturbations:
 from collections.abc import Callable
 from copy import deepcopy
 from functools import partial
+from math import prod
 
 import jax
 import jax.numpy as jnp
@@ -26,28 +27,40 @@ from laplax.config import lmap
 
 
 def set_prob_predictive_with_input_perturbations(
-    model, prior_scale, input_shape, **kwargs
+    model, prior_scale, input_shape=None, **kwargs
 ):
-    rng = kwargs.get("rng", jax.random.PRNGKey(0))
-    n_weight_samples = kwargs.get("n_weight_samples", 100)
+    # Get relevant hyperparameters
+    rng = kwargs.get("key")
+    n_weight_samples = kwargs.get("n_weight_samples")
     mode = kwargs.get("mode", "metric")
-    # mc_samples = prior_scale * jax.random.normal(rng, (n_weight_samples, *input_shape))
+    pre_sample = kwargs.get("pre_sample", False)
+    if pre_sample and input_shape is None:
+        msg = "Input shape must be provided for pre-sampling."
+        raise ValueError(msg)
 
-    rng_weights = deepcopy(rng)
+    # Define random sampling for mc sampling
+    rng_weights = jax.random.split(rng, n_weight_samples)
+    if pre_sample:
+        wight_noise = prior_scale * jax.vmap(
+            lambda key: jax.random.normal(key, (*input_shape,))
+        )(rng_weights)
 
-    def sample_weights_generator():
-        rng_local = deepcopy(rng_weights)
-        for _ in range(n_weight_samples):
-            rng_local, _ = jax.random.split(rng_local)
-            random_sample = prior_scale * jax.random.normal(rng_local, (*input_shape,))
-            yield random_sample
+    def get_prob_predictive(input: jax.Array):
+        # Define function to generate ptw predictions
+        def single_sample_predictions(idx: int):
+            if pre_sample:
+                return model(input + wight_noise[idx])
+            return model(
+                input
+                + prior_scale * jax.random.normal(rng_weights[idx], (*input.shape,))
+            )
 
-    def get_prob_predictive(x):
-        pred = model(x)
-        # pred_ensemble = lmap(model, x[None] + mc_samples)
-        pred_ensemble = jnp.asarray([
-            model(x + eps) for eps in sample_weights_generator()
-        ])
+        # Ensemble predictions
+        pred_ensemble = lmap(single_sample_predictions, jnp.arange(n_weight_samples))
+
+        # General prediction
+        pred = model(input)
+
         return {
             "pred": pred,
             "pred_mean": jax.numpy.mean(pred_ensemble, axis=0),
@@ -58,7 +71,7 @@ def set_prob_predictive_with_input_perturbations(
     return get_prob_predictive
 
 
-def initialize_input_perturbations(model, input_shape):
+def initialize_input_perturbations(model, input_shape, **kwargs):
     # set model_fn : x -> model(x, p)
     def model_fn(x):
         return model(x)
@@ -76,6 +89,7 @@ def initialize_input_perturbations(model, input_shape):
         set_prob_predictive_with_input_perturbations,
         model=model,
         input_shape=input_shape,
+        **kwargs,
     )
 
     return {
@@ -91,42 +105,66 @@ def initialize_input_perturbations(model, input_shape):
 # --------------------------------------------------------------------
 
 
-def set_prob_predictive_with_weight_perturbations(  # noqa: PLR0913, PLR0917
+def set_prob_predictive_with_weight_perturbations(
     model_fn: Callable,
     prior_scale: float,
-    params: dict,
-    param_shapes: list[tuple],
-    param_access: Callable,
-    param_set: Callable,
+    relevant_params: list[jax.Array],
+    set_params: dict,
     **kwargs,
 ):
     """Return prob-predictions for weight perturbations."""
+    # Get relevant hyperparameters
     rng = kwargs.get("rng", jax.random.PRNGKey(0))
     n_weight_samples = kwargs.get("n_weight_samples", 100)
     mode = kwargs.get("mode", "metric")
-    keys = jax.random.split(rng, n_weight_samples)
-    mc_samples = [
-        prior_scale * jax.random.normal(key, (n_weight_samples, *shape))
-        for key, shape in zip(keys, param_shapes, strict=False)
-    ]
-    params_true = deepcopy(param_access(params))
-    params_change = deepcopy(params)
-    params_perturbed = []
-    params_perturbed = [
-        deepcopy(
-            param_set(
-                params_change,
-                [p + eps for p, eps in zip(params_true, perturbs, strict=False)],
+    pre_sample = kwargs.get("pre_sample", False)
+
+    # Get model subset behavior
+    params_true = deepcopy(relevant_params)
+    param_shapes = [p.shape for p in relevant_params]
+    n_params = 0
+    split_indices = [n_params := n_params + prod(shape) for shape in param_shapes][:-1]
+
+    def flat_to_list_split(flat_params):
+        return jnp.split(flat_params, split_indices)
+
+    def perturb_params(key):
+        return deepcopy(
+            set_params(
+                [
+                    p + eps.reshape(p.shape)
+                    for p, eps in zip(
+                        params_true,
+                        flat_to_list_split(
+                            prior_scale * jax.random.normal(key, (n_params,))
+                        ),
+                        strict=True,
+                    )
+                ],
             )
         )
-        for perturbs in zip(*mc_samples, strict=False)
-    ]
 
-    def get_prob_predictions(input):
-        pred = model_fn(input=input, params=param_set(params_change, params_true))
-        pred_ensemble = jnp.asarray([
-            model_fn(input=input, params=p) for p in params_perturbed
-        ])
+    # Define random sampling
+    rng_weights = jax.random.split(rng, n_weight_samples)
+    if pre_sample:
+        params_perturbed = jax.vmap(perturb_params)(rng_weights)
+
+    # Set prob predictive
+    def get_prob_predictions(input: jax.Array) -> dict[jax.Array]:
+        # Define function to generate ptw predictions
+        def single_sample_predictions(idx: int):
+            if pre_sample:
+                return model_fn(input=input, params=params_perturbed[idx])
+            return model_fn(
+                input=input,
+                params=perturb_params(rng_weights[idx]),
+            )
+
+        # Ensemble predictions
+        pred_ensemble = lmap(single_sample_predictions, jnp.arange(n_weight_samples))
+
+        # General prediction
+        pred = model_fn(input=input, params=set_params(params_true))
 
         return {
             "pred": pred,
