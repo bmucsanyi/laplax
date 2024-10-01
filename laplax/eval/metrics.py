@@ -1,4 +1,6 @@
 # noqa: D100
+import math
+
 import jax
 import jax.numpy as jnp
 from jax import lax
@@ -185,6 +187,6 @@ def nll_gaussian(  # noqa: D417
 
     # Scale the result by the number of data points if `scaled` is True
     if scaled:
-        nll /= len(nll_list)
+        nll /= math.prod(pred.shape)
 
     return nll
