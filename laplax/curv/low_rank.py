@@ -85,11 +85,12 @@ def get_low_rank_approx_with_large_eigenvalues(ggn: GGN, maxiter: int = 200):
         # dtype=ggn.dtype,
         # TODO(2bys): Check whether we should also run this in jnp.float64
     )
-    print(b.dtype)
     eigen_sketch, eigen_vec_sketch, _ = lobpcg_standard(ggn, b, m=maxiter)
-    print(eigen_sketch)
+    print("Sketched eigen_values: ", eigen_sketch)
     ggn_eigen = {
-        "U": jnp.asarray(eigen_vec_sketch, dtype=jnp.float32),
+        "U": jnp.asarray(
+            eigen_vec_sketch, dtype=jnp.float32
+        ),  # Change to laplax_dtype()
         "S": jnp.asarray(eigen_sketch, dtype=jnp.float32),
     }
     jax.config.update("jax_enable_x64", False)

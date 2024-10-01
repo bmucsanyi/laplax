@@ -114,8 +114,8 @@ def set_prob_predictive_with_weight_perturbations(
 ):
     """Return prob-predictions for weight perturbations."""
     # Get relevant hyperparameters
-    rng = kwargs.get("rng", jax.random.PRNGKey(0))
-    n_weight_samples = kwargs.get("n_weight_samples", 100)
+    key = kwargs.get("key")
+    n_weight_samples = kwargs.get("n_weight_samples")
     mode = kwargs.get("mode", "metric")
     pre_sample = kwargs.get("pre_sample", False)
 
@@ -145,7 +145,7 @@ def set_prob_predictive_with_weight_perturbations(
         )
 
     # Define random sampling
-    rng_weights = jax.random.split(rng, n_weight_samples)
+    rng_weights = jax.random.split(key, n_weight_samples)
     if pre_sample:
         params_perturbed = jax.vmap(perturb_params)(rng_weights)
 
