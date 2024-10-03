@@ -31,6 +31,18 @@ def evaluate_for_given_prior_prec(
     return res
 
 
+# ------------------------------------------------------------------------------
+# Alternative optimization
+# ------------------------------------------------------------------------------
+
+# Gradient-based optimization
+
+
+# ------------------------------------------------------------------------------
+# Grid search
+# ------------------------------------------------------------------------------
+
+
 def grid_search(
     prior_prec_interval: jax.Array,
     objective: Callable[[float, tuple[jax.Array, jax.Array]], float],
