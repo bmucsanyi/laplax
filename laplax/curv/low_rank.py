@@ -79,7 +79,7 @@ def get_low_rank_approx_with_large_eigenvalues(ggn: GGN, maxiter: int = 200):
 
     jax.config.update("jax_enable_x64", True)
     b = jax.random.normal(
-        jax.random.PRNGKey(1),
+        jax.random.key(2759847),
         (ggn.shape[0], maxiter),
         dtype=jnp.float64,
         # dtype=ggn.dtype,

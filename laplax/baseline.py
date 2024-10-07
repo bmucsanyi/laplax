@@ -19,7 +19,7 @@ from math import prod
 import jax
 import jax.numpy as jnp
 
-from laplax.config import lmap
+from laplax.config import laplax_dtype, lmap
 
 # --------------------------------------------------------------------
 # BASELINE: Input perturbations
@@ -27,7 +27,7 @@ from laplax.config import lmap
 
 
 def set_prob_predictive_with_input_perturbations(
-    model, prior_scale, input_shape=None, **kwargs
+    model, prior_scale, input_shape=None, metrics="marginal", **kwargs
 ):
     # Get relevant hyperparameters
     rng = kwargs.get("key")
@@ -52,11 +52,24 @@ def set_prob_predictive_with_input_perturbations(
                 return model(input + wight_noise[idx])
             return model(
                 input
-                + prior_scale * jax.random.normal(rng_weights[idx], (*input.shape,))
+                + prior_scale
+                * jax.random.normal(
+                    rng_weights[idx], (*input.shape,), dtype=laplax_dtype()
+                )
             )
 
         # Ensemble predictions
         pred_ensemble = lmap(single_sample_predictions, jnp.arange(n_weight_samples))
+        pred_mean = jax.numpy.mean(pred_ensemble, axis=0)
+
+        if metrics == "full":
+            return {
+                "pred_mean": pred_mean,
+                "pred_cov": jnp.cov(
+                    pred_ensemble.reshape(n_weight_samples, -1),
+                    rowvar=False,
+                ),
+            }
 
         # General prediction
         pred = model(input)
@@ -110,6 +123,7 @@ def set_prob_predictive_with_weight_perturbations(
     prior_scale: float,
     relevant_params: list[jax.Array],
     set_params: dict,
+    metrics: str = "marginal",
     **kwargs,
 ):
     """Return prob-predictions for weight perturbations."""
@@ -136,7 +150,8 @@ def set_prob_predictive_with_weight_perturbations(
                     for p, eps in zip(
                         params_true,
                         flat_to_list_split(
-                            prior_scale * jax.random.normal(key, (n_params,))
+                            prior_scale
+                            * jax.random.normal(key, (n_params,), dtype=laplax_dtype())
                         ),
                         strict=True,
                     )
@@ -162,13 +177,23 @@ def set_prob_predictive_with_weight_perturbations(
 
         # Ensemble predictions
         pred_ensemble = lmap(single_sample_predictions, jnp.arange(n_weight_samples))
+        pred_mean = jax.numpy.mean(pred_ensemble, axis=0)
+
+        if metrics == "full":
+            return {
+                "pred_mean": pred_mean,
+                "pred_cov": jnp.cov(
+                    pred_ensemble.reshape(n_weight_samples, -1),
+                    rowvar=False,
+                ),
+            }
 
         # General prediction
         pred = model_fn(input=input, params=set_params(params_true))
 
         return {
             "pred": pred,
-            "pred_mean": jax.numpy.mean(pred_ensemble, axis=0),
+            "pred_mean": pred_mean,
             "pred_std": jax.numpy.std(pred_ensemble, axis=0),
             "pred_ensemble": pred_ensemble if mode == "ensemble" else None,
         }
