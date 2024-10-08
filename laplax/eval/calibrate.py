@@ -77,8 +77,8 @@ def optimize_prior_prec(
     objective: Callable[[float, tuple[jax.Array, jax.Array]], float],
     data: tuple[jax.Array, jax.Array],
     log_prior_prec_min: float = -5.0,
-    log_prior_prec_max: float = 4.0,
-    grid_size: int = 100,
+    log_prior_prec_max: float = 6.0,
+    grid_size: int = 300,
 ) -> float:
     prior_prec_interval = jnp.logspace(
         start=log_prior_prec_min,
