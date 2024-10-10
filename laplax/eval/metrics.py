@@ -184,7 +184,7 @@ def nll_gaussian(  # noqa: D417
     # Compute negative log likelihood
     nll_list = jax.scipy.stats.norm.logpdf(residuals, scale=pred_std)
     nll = -1 * jnp.sum(nll_list)
-
+    
     # Scale the result by the number of data points if `scaled` is True
     if scaled:
         nll /= math.prod(pred.shape)

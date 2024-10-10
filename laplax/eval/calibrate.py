@@ -16,12 +16,13 @@ def calibration_metric(**predictions):
 
 
 def evaluate_for_given_prior_prec(
-    prior_prec: float,
-    data,
+    *,
+    data: tuple[jax.Array, jax.Array],
     set_prob_predictive=Callable,
     metric=calibration_metric,
+    **kwargs,
 ):
-    prob_predictive = set_prob_predictive(prior_scale=prior_prec)
+    prob_predictive = set_prob_predictive(**kwargs)
 
     def evaluate_data(dp):
         input, target = dp
@@ -31,24 +32,18 @@ def evaluate_for_given_prior_prec(
     return res
 
 
-# ------------------------------------------------------------------------------
-# Alternative optimization
-# ------------------------------------------------------------------------------
-
-# Gradient-based optimization
-
-
-# ------------------------------------------------------------------------------
-# Grid search
-# ------------------------------------------------------------------------------
-
-
 def grid_search(
     prior_prec_interval: jax.Array,
     objective: Callable[[float, tuple[jax.Array, jax.Array]], float],
     data: tuple[jax.Array, jax.Array],
+    patience: int = 5,
+    max_iterations: int = None
 ) -> float:
     results, prior_precs = [], []
+    increasing_count = 0
+    previous_result = None
+    iteration = 0
+
     for prior_prec in prior_prec_interval:
         start_time = time.perf_counter()
         try:
@@ -56,21 +51,46 @@ def grid_search(
         except ValueError as error:
             print(f"Caught an exception in validate: {error}")  # noqa: T201
             result = float("inf")
-        if jnp.isnan(result):  # TODO(2bys): Check if we want this.
+        
+        if jnp.isnan(result):
             print("Caught nan, setting result to inf.")  # noqa: T201
             result = float("inf")
+        
+        # Logging for performance and tracking
         print(  # noqa: T201
             f"Took {time.perf_counter() - start_time:.4f} seconds, "
             f"prior prec: {prior_prec:.4f}, result: {result:.6f}"
         )
+        
         results.append(result)
         prior_precs.append(prior_prec)
 
-    best_prior_prec = prior_precs[np.nanargmin(results)]
+        # If we have a previous result, check if the result has increased
+        if previous_result is not None:
+            if result > previous_result:
+                increasing_count += 1
+                print(f"Result increased, increasing_count = {increasing_count}")  # noqa: T201
+            else:
+                increasing_count = 0
 
+            # Stop if the results have increased for `patience` consecutive iterations
+            if increasing_count >= patience:
+                print(f"Stopping early due to {patience} consecutive increasing results.")  # noqa: T201
+                break
+        
+        previous_result = result
+        iteration += 1
+        
+        # Check if maximum iterations reached
+        if max_iterations is not None and iteration >= max_iterations:
+            print(f"Stopping due to reaching max iterations: {max_iterations}")  # noqa: T201
+            break
+
+    best_prior_prec = prior_precs[np.nanargmin(results)]
     print(f"Chosen prior prec: {best_prior_prec:.4f}")  # noqa: T201
 
     return best_prior_prec
+
 
 
 def optimize_prior_prec(
