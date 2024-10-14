@@ -37,31 +37,30 @@ def grid_search(
     objective: Callable[[float, tuple[jax.Array, jax.Array]], float],
     data: tuple[jax.Array, jax.Array],
     patience: int = 5,
-    max_iterations: int = None
+    max_iterations: int | None = None,
 ) -> float:
     results, prior_precs = [], []
     increasing_count = 0
     previous_result = None
-    iteration = 0
 
-    for prior_prec in prior_prec_interval:
+    for iteration, prior_prec in enumerate(prior_prec_interval):
         start_time = time.perf_counter()
         try:
             result = objective(prior_prec, data)
         except ValueError as error:
             print(f"Caught an exception in validate: {error}")  # noqa: T201
             result = float("inf")
-        
+
         if jnp.isnan(result):
             print("Caught nan, setting result to inf.")  # noqa: T201
             result = float("inf")
-        
+
         # Logging for performance and tracking
         print(  # noqa: T201
             f"Took {time.perf_counter() - start_time:.4f} seconds, "
             f"prior prec: {prior_prec:.4f}, result: {result:.6f}"
         )
-        
+
         results.append(result)
         prior_precs.append(prior_prec)
 
@@ -75,12 +74,10 @@ def grid_search(
 
             # Stop if the results have increased for `patience` consecutive iterations
             if increasing_count >= patience:
-                print(f"Stopping early due to {patience} consecutive increasing results.")  # noqa: T201
                 break
-        
+
         previous_result = result
-        iteration += 1
-        
+
         # Check if maximum iterations reached
         if max_iterations is not None and iteration >= max_iterations:
             print(f"Stopping due to reaching max iterations: {max_iterations}")  # noqa: T201
@@ -90,7 +87,6 @@ def grid_search(
     print(f"Chosen prior prec: {best_prior_prec:.4f}")  # noqa: T201
 
     return best_prior_prec
-
 
 
 def optimize_prior_prec(

@@ -64,14 +64,6 @@ class GGN:
         self.shape = (num_params, num_params)
         self.dtype = dtype or laplax_dtype()
 
-    # def astype(self, dtype) -> Self:
-    #     self.params = iterate_and_apply(
-    #         self.params, lambda x: print(type(x))
-    #         #nnx.Variable(jnp.asarray(x.value, dtype=dtype))
-    #     )  # .astype(dtype))
-    #     self.dtype = dtype
-    #     return self
-
     def mv_ggn_ptw(self, x: jax.Array, vec: jax.Array, params: dict) -> Any:
         inflated_vec = self.inflate_pytree(vec)
         mean_logit, Jv = self.jvp_fn(params, x, inflated_vec)  # [C], [C] # noqa: F841
