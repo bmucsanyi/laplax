@@ -77,7 +77,7 @@ def get_low_rank_approx_with_large_eigenvalues(ggn: GGN, maxiter: int = 200):
         # necessary assertion for lobpcg_standard function.
         maxiter = ggn.shape[0] // 5 - 1
 
-    jax.config.update("jax_enable_x64", True)
+    jax.config.update("jax_enable_x64", True)  # noqa: FBT003
     b = jax.random.normal(
         jax.random.key(2759847),
         (ggn.shape[0], maxiter),
@@ -86,12 +86,11 @@ def get_low_rank_approx_with_large_eigenvalues(ggn: GGN, maxiter: int = 200):
         # TODO(2bys): Check whether we should also run this in jnp.float64
     )
     eigen_sketch, eigen_vec_sketch, _ = lobpcg_standard(ggn, b, m=maxiter)
-    print("Sketched eigen_values: ", eigen_sketch)
     ggn_eigen = {
         "U": jnp.asarray(
             eigen_vec_sketch, dtype=jnp.float32
         ),  # Change to laplax_dtype()
         "S": jnp.asarray(eigen_sketch, dtype=jnp.float32),
     }
-    jax.config.update("jax_enable_x64", False)
+    jax.config.update("jax_enable_x64", False)  # noqa: FBT003
     return ggn_eigen
