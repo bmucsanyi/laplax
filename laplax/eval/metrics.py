@@ -120,25 +120,13 @@ def estimate_q(
     pred_mean: jnp.ndarray,
     pred_std: jnp.ndarray,
     target: jnp.ndarray,
-    **kwargs,
 ) -> float:
     """Estimate the q value."""
-    # Flatten arrays if `flatten` is True
-    if kwargs.get("flatten", False):
-        pred_mean = pred_mean.flatten()
-        pred_std = pred_std.flatten()
-        target = target.flatten()
-
     return jnp.mean(jnp.power(pred_mean - target, 2) / jnp.power(pred_std, 2))
 
 
-def estimate_rmse(pred_mean: jax.Array, target: jax.Array, **kwargs) -> float:
+def estimate_rmse(pred_mean: jax.Array, target: jax.Array) -> float:
     """Estimate the RMSE."""
-    # Flatten arrays if `flatten` is True
-    if kwargs.get("flatten", False):
-        pred_mean = pred_mean.flatten()
-        target = target.flatten()
-
     return jnp.sqrt(jnp.mean(jnp.power(pred_mean - target, 2)))
 
 
@@ -167,12 +155,6 @@ def nll_gaussian(  # noqa: D417
 
     This code follows: https://github.com/uncertainty-toolbox/uncertainty-toolbox/blob/main/uncertainty_toolbox/metrics_scoring_rule.py
     """
-    # Flatten arrays if `flatten` is True
-    if kwargs.get("flatten", False):
-        pred = pred.flatten()
-        pred_std = pred_std.flatten()
-        target = target.flatten()
-
     # Ensure input arrays are 1D and of the same shape
     assert (  # noqa: S101
         pred.shape == pred_std.shape == target.shape

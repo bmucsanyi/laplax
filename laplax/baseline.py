@@ -19,7 +19,7 @@ from math import prod
 import jax
 import jax.numpy as jnp
 
-from laplax.config import laplax_dtype, lmap
+from laplax.util.ops import laplax_dtype, lmap
 
 # --------------------------------------------------------------------
 # BASELINE: Input perturbations

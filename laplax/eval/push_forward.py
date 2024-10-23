@@ -5,36 +5,52 @@ weight space uncertainty onto output uncertainty.
 """
 
 import jax
-from jax import random
-from jaxtyping import PyTree
+import jax.numpy as jnp
 
-from laplax.config import lmap
-
-# --------------------------------------------------------------------------------
-# Monte Carlo predictions
-# --------------------------------------------------------------------------------
+from laplax.types import Callable, KeyType, PyTree
+from laplax.util.ops import lmap, precompute_list
+from laplax.util.tree import add, randn_like, std
 
 
-def create_mc_predictions_for_data_point_fn(model_fn, mean, prior_scale, param_builder):
-    rng_key, _ = jax.random.PRNGKey(42)
-    samples = random.multivariate_normal(rng_key, mean, prior_scale, (1000,))
+def get_normal_weight_samples(
+    key: KeyType,
+    mean: PyTree,
+    scale_mv: Callable,
+) -> PyTree:
+    # Draw white noise
+    noise = randn_like(key, mean)
 
-    def get_predictions_for_data_point(data_point: jax.Array):
-        def pred_fn(p: PyTree) -> jax.Array:
-            return model_fn(param_builder(p), data_point)
+    # Apply scale mv
+    return add(mean, scale_mv(noise))
 
-        la_pred = lmap(pred_fn, samples)
-        # jax.vmap(pred_fn)(samples)
-        model_pred = pred_fn(mean)
+
+def set_mc_pushforward(
+    key: KeyType,
+    model_fn: Callable,
+    mean: PyTree,
+    scale_mv: Callable,
+    n_weight_samples: int,
+) -> Callable:
+    # Create sample function
+    keys = jax.random.split(key, n_weight_samples)
+
+    def get_weight_sample(idx):
+        return get_normal_weight_samples(keys[idx], mean, scale_mv)
+
+    get_weight_sample = precompute_list(get_weight_sample, jnp.arange(n_weight_samples))
+
+    def prob_predictive(input):
+        def func_ptw(idx):
+            weight_sample = get_weight_sample(idx)
+            return model_fn(params=weight_sample, input=input)
+
+        pred = model_fn(params=mean, input=input)
+        pred_ensemble = lmap(func_ptw, jnp.arange(n_weight_samples))
+
         return {
-            "pred": model_pred,
-            "pred_mean": la_pred.mean(axis=0),
-            "pred_std": la_pred.std(axis=0),
+            "pred": pred,
+            "pred_mean": pred_ensemble,
+            "pred_std": std(pred_ensemble, axis=0),
         }
 
-    return get_predictions_for_data_point
-
-
-# --------------------------------------------------------------------------------
-# Linearization
-# --------------------------------------------------------------------------------
+    return prob_predictive

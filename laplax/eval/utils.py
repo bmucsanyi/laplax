@@ -4,7 +4,7 @@ from typing import Any
 
 import jax
 
-from laplax.config import lmap
+from laplax.util.ops import lmap
 
 
 def get_predictions_for_data_point_fn():

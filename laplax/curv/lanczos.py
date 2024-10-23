@@ -1,42 +1,24 @@
-# noqa: D100
-from typing import Any
+"""Lanczos implementations for low rank approximations."""
 
 import jax
 import jax.numpy as jnp
 
-from laplax.curv.ggn import GGN
-from laplax.curv.util import flatten_pytree
+from laplax.types import Callable, KeyType, ShapeType
 
 
-def lanczos_random_init(shape: tuple) -> jax.Array:
-    rng = jax.random.PRNGKey(1743798)
-    return jax.random.normal(rng, shape)
-
-
-def lanczos_averaged_vjp_init(ggn: GGN) -> jax.Array:
-    """Transposed Jacobian-vector product initialization for Lanczos algorithm.
-
-    This function initializes with a vector that lies in the range of the transposed
-    Jacobian. TODO: There might be more improvement here. Let us talk to Marvin or
-    Tristan.
-    """
-    x, _ = ggn.data
-    pred, jvp_fun = jax.vjp(lambda p: ggn.model_fn(p, x[0]), ggn.params)
-    return flatten_pytree(jvp_fun(jnp.ones_like(pred, dtype=ggn.dtype) / pred.size))[
-        0
-    ]
+def lanczos_random_init(key: KeyType, shape: ShapeType) -> jax.Array:
+    return jax.random.normal(key, shape)
 
 
 def lanczos_isqrt_full_reortho(
-    # Assuming A is a matrix or a callable that performs matrix-vector multiplication
-    A: Any,
+    A: Callable,
     b: jax.Array,
     maxiter: int | None = None,
     tol: float | None = None,
     *,
     overwrite_b: bool = False,
 ) -> jax.Array:
-    """TODO(2bys): write this docstring.
+    """Inverse square root lanczos algorithm.
 
     Example inputs:
     >>> n = 100
@@ -72,8 +54,7 @@ def lanczos_isqrt_full_reortho(
 
     # Set eta to an arbitrary large value
     eta = 9999.0
-    op_mul = jax.jit(A.__matmul__)
-
+    op_mul = jax.jit(A)  # TODO(2bys): Check whether we should use jit outside.
     while k < maxiter and rs_norm_sq[k] > sqtol and eta > 1e-6:
         # Compute search direction
         if k > 0:

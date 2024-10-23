@@ -6,8 +6,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from laplax.config import laplax_dtype, lmap
 from laplax.eval.metrics import estimate_q
+from laplax.util.ops import laplax_dtype, lmap
 
 
 # Calibrate prior

@@ -1,96 +1,146 @@
-# noqa: D100
-from copy import deepcopy
-from functools import partial
+from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
 from jax.experimental.sparse.linalg import lobpcg_standard
 
-import laplax
-from laplax.curv.ggn import GGN
+from laplax.curv.lanczos import lanczos_isqrt_full_reortho, lanczos_random_init
+from laplax.types import DType, KeyType
+
+# ---------------------------------------------------------------
+# Low rank approximations
+# ---------------------------------------------------------------
 
 
-def scalar_plus_low_rank_mv(x, scalar, U, S):
-    return scalar * x + U @ (S[:, None] * (U.T @ x))
+def get_low_rank_small_eigenvalues(
+    mv: Callable,
+    maxiter: int,
+    size: int,
+    key: KeyType,
+    dtype: DType = jnp.float64,
+) -> dict:
+    # Initialize the Lanczos algorithm
+    b = lanczos_random_init(key, size)
 
+    # Run the Lanczos algorithm
+    D = lanczos_isqrt_full_reortho(mv, b, maxiter=maxiter)
 
-def scalar_plus_low_rank_invert(U, S, scalar):
-    return partial(
-        scalar_plus_low_rank_mv,
-        scalar=1 / scalar,
-        U=U,
-        S=-S / (scalar * (S + scalar)),
-    )
+    # Calculate svd of low rank
+    svd_result = jnp.linalg.svd(D, full_matrices=False)
 
-
-def set_prob_predictive_with_low_rank(
-    model_fn, prior_scale, params_flat, inflate_params, low_rank_terms, **kwargs
-):
-    rng = jax.random.PRNGKey(0)
-    n_weight_samples = 100
-    n_params = low_rank_terms["U"].shape[0]
-    params_true = deepcopy(params_flat)
-    low_rank_mv = scalar_plus_low_rank_invert(
-        U=low_rank_terms["U"], S=low_rank_terms["S"], scalar=prior_scale
-    )
-    weight_samples = (
-        params_flat[None]
-        + low_rank_mv(jax.random.normal(rng, (n_params, n_weight_samples))).T
-    )
-    save_ensemble = kwargs.get("mode", "metric") == "ensemble"
-
-    def get_prob_predictive(input: jax.Array):
-        pred = model_fn(params=inflate_params(params_true), input=input)
-        pred_ensemble = jnp.asarray([
-            model_fn(params=inflate_params(weight), input=input)
-            for weight in weight_samples
-        ])
-        return {
-            "pred": pred,
-            "pred_mean": jax.numpy.mean(pred_ensemble, axis=0),
-            "pred_std": jax.numpy.std(pred_ensemble, axis=0),
-            "ensemble": pred_ensemble if save_ensemble else None,
-        }
-
-    return get_prob_predictive
-
-
-def get_low_rank_approx_with_small_eigenvalues(ggn: GGN, maxiter: int = 200):
-    b = laplax.curv.lanczos.lanczos_random_init(ggn.shape[:1])
-    # b = reparamax.curv.lanczos.lanczos_averaged_vjp_init(ggn)
-    with jax.experimental.enable_x64():
-        D = laplax.curv.lanczos.lanczos_isqrt_full_reortho(
-            ggn, b, maxiter=maxiter
-        )  # maxiter is the target rank
-        svd_result = jnp.linalg.svd(D, full_matrices=False)
-        ggn_eigen = {
-            "U": jnp.asarray(svd_result.U, dtype=b.dtype),
-            "S": jnp.asarray(svd_result.S**-2, dtype=b.dtype),
-        }
-    # ggn.astype(jnp.float32)  # Params need to be jnp.float32 afterwards.
-    # TODO(2bys): Find a general solution for dtype. Callables will not have types.
-    return ggn_eigen
-
-
-def get_low_rank_approx_with_large_eigenvalues(ggn: GGN, maxiter: int = 200):
-    if ggn.shape[0] < maxiter * 5:
-        # necessary assertion for lobpcg_standard function.
-        maxiter = ggn.shape[0] // 5 - 1
-
-    jax.config.update("jax_enable_x64", True)  # noqa: FBT003
-    b = jax.random.normal(
-        jax.random.key(2759847),
-        (ggn.shape[0], maxiter),
-        dtype=jnp.float64,
-        # dtype=ggn.dtype,
-        # TODO(2bys): Check whether we should also run this in jnp.float64
-    )
-    eigen_sketch, eigen_vec_sketch, _ = lobpcg_standard(ggn, b, m=maxiter)
-    ggn_eigen = {
-        "U": jnp.asarray(
-            eigen_vec_sketch, dtype=jnp.float32
-        ),  # Change to laplax_dtype()
-        "S": jnp.asarray(eigen_sketch, dtype=jnp.float32),
+    return {
+        "U": jnp.asarray(svd_result.U, dtype=dtype),
+        "S": jnp.asarray(svd_result.S**-2, dtype=dtype),
     }
-    jax.config.update("jax_enable_x64", False)  # noqa: FBT003
-    return ggn_eigen
+
+
+def get_low_rank_large_eigenvalues(
+    mv: Callable,
+    maxiter: int,
+    size: int,
+    key: KeyType,
+    dtype: DType = jnp.float64,
+) -> dict:
+    # Assert
+    if size < maxiter * 5:
+        print(
+            f"Warning: maxiter {maxiter} too large for size, "
+            f"reducing to {size // 5 - 1}."
+        )
+        maxiter = size // 5 - 1
+
+    # Initialize lanczos
+    b = jax.random.normal(key, (size, maxiter), dtype=dtype)
+
+    # Run lanczos
+    eigenvals, eigenvecs, _ = lobpcg_standard(mv, b, m=maxiter)
+
+    return {
+        "U": jnp.asarray(eigenvecs, dtype=dtype),
+        "S": jnp.asarray(eigenvecs, dtype=dtype),
+    }
+
+
+low_rank_options = {
+    "large": get_low_rank_large_eigenvalues,
+    "small": get_low_rank_small_eigenvalues,
+}
+
+
+def get_low_rank(
+    mv: Callable,
+    size: int,
+    key: KeyType,
+    maxiter: int = 20,
+    local_dtype_switch: bool = True,
+    eigval_mode: str = "small",
+    dtype: DType = jnp.float64,
+) -> dict:
+    """Handling low rank calculations."""
+    # Set local dtype if necessary
+    if local_dtype_switch and dtype != jnp.float64:
+        jax.config.update("jax_enable_x64", True)
+        local_dtype = jnp.float64
+    else:
+        local_dtype = dtype
+
+    # Get low rank
+    low_rank_tuple = low_rank_options[eigval_mode](
+        mv, maxiter=maxiter, size=size, key=key, dtype=local_dtype
+    )
+
+    # Adjust dtype and set global dtype variable.
+    if dtype != local_dtype:
+        low_rank_tuple = jax.tree.map(dtype, low_rank_tuple)
+
+        if local_dtype_switch:
+            jax.config.update("jax_enable_x64", False)
+
+    return low_rank_tuple
+
+
+# -------------------------------------------------------------
+# Low rank mv callables
+# -------------------------------------------------------------
+
+
+def low_rank_mv_factory(low_rank_terms: dict):
+    # Extract terms
+    U = low_rank_terms["U"]
+    S = low_rank_terms["S"]
+
+    # Define mv-product
+    def low_rank_mv(vec):
+        return U @ (S[:, None] * (U.T @ vec))
+
+    return low_rank_mv
+
+
+def low_rank_plus_diagonal_mv_factory(low_rank_terms: dict):
+    # Extract terms
+    U = low_rank_terms["U"]
+    S = low_rank_terms["S"]
+    scalar = low_rank_terms["scalar"]
+
+    # Define mv-product
+    def low_rank_mv(vec):
+        return scalar * vec + U @ (S[:, None] * (U.T @ vec))
+
+    return low_rank_mv
+
+
+def invert_low_rank_plus_diagonal(low_rank_terms: dict):
+    # Extract terms
+    U = low_rank_terms["U"]
+    S = low_rank_terms["S"]
+    scalar = low_rank_terms["scalar"]
+
+    return {"U": U, "S": -S / (scalar * (S + scalar)), "scalar": scalar}
+
+
+def inv_low_rank_plus_diagonal_mv_factory(low_rank_terms: dict):
+    # inverse low rank terms
+    low_rank_terms_inv = invert_low_rank_plus_diagonal(low_rank_terms)
+
+    # create mv product
+    return low_rank_mv_factory(low_rank_terms_inv)
