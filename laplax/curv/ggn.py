@@ -12,7 +12,7 @@ from laplax.util.ops import lmap
 # ---------------------------------------------------------------------
 
 
-def loss_hessian_mv_factory(loss_fn: str | Callable) -> Callable:
+def create_loss_hessian_mv(loss_fn: str | Callable) -> Callable:
     """Return the Hessian-vector product for a given loss function.
 
     Args:
@@ -50,7 +50,7 @@ def loss_hessian_mv_factory(loss_fn: str | Callable) -> Callable:
     return loss_hessian_mv
 
 
-def ggn_mv_factory(
+def create_ggn_mv(
     model_fn: Callable,
     params: dict,
     data: tuple[jax.Array, jax.Array],
@@ -74,12 +74,12 @@ def ggn_mv_factory(
     def vjp_fn(params, input):
         return jax.vjp(lambda p: model_fn(params=p, input=input), params)
 
-    loss_hessian_mv = loss_hessian_mv_factory(loss_fn)
+    loss_hessian_mv = create_loss_hessian_mv(loss_fn)
 
     def mv_ggn_ptw(input, target, vec):
         """Calculate JT_p H_L J_p v for a single data point."""
         pred, jv = jvp_fn(params, input, vec)
-        hjv = loss_hessian_mv(jv, pred, target)
+        hjv = loss_hessian_mv(jv, pred=pred, target=target)
         gv = vjp_fn(params, input)[1](hjv)[0]
         return gv
 
