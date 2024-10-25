@@ -15,8 +15,8 @@ from laplax.util.ops import lmap
 # ---------------------------------------------------------------
 
 
-def get_size(pytree):
-    flat, _ = jax.tree_util.tree_flatten(pytree)
+def get_size(tree):
+    flat, _ = jax.tree_util.tree_flatten(tree)
     return sum(math.prod(arr.shape) for arr in flat)
 
 
@@ -25,15 +25,15 @@ def get_size(pytree):
 # ---------------------------------------------------------------
 
 
-def ones_like(pytree):
-    return jax.tree.map(jnp.ones_like, pytree)
+def ones_like(tree):
+    return jax.tree.map(jnp.ones_like, tree)
 
 
-def zeros_like(pytree):
-    return jax.tree.map(jnp.zeros_like, pytree)
+def zeros_like(tree):
+    return jax.tree.map(jnp.zeros_like, tree)
 
 
-def randn_like(key, pytree):
+def randn_like(key, tree):
     """Generates a White Noise PyTree in the form of given PyTree.
 
     Args:
@@ -45,19 +45,19 @@ def randn_like(key, pytree):
             and shape as `pytree`.
     """
     # Split the key according to number of leaves
-    keys = jax.random.split(key, len(jax.tree_util.tree_leaves(pytree)))
+    keys = jax.random.split(key, len(jax.tree_util.tree_leaves(tree)))
 
     # Define a random number generator
     def generate_random_leaf(leaf, subkey):
         return jax.random.normal(subkey, shape=leaf.shape)
 
     # Apply the function to each leaf of the pytree.
-    return jax.tree.map(generate_random_leaf, pytree, keys)
+    return jax.tree.map(generate_random_leaf, tree, keys)
 
 
-def basis_vector_from_index(tree, idx):
+def basis_vector_from_index(idx, tree):
     # Create a tree of zeros with the same structure
-    zeros = jax.tree_util.tree_map(jnp.zeros_like, tree)
+    zeros = zeros_like(tree)
 
     # Flatten the tree to get a list of arrays and the tree definition
     flat, tree_def = jax.tree_util.tree_flatten(zeros)
@@ -87,13 +87,13 @@ def basis_vector_from_index(tree, idx):
     return jax.tree_util.tree_unflatten(tree_def, updated_flat)
 
 
-def eye(pytree):
-    n_ele = get_size(pytree)
-    return lmap(partial(basis_vector_from_index, pytree=pytree))(jnp.arange(n_ele))
+def eye_like(tree):
+    n_ele = get_size(tree)
+    return lmap(partial(basis_vector_from_index, tree=tree), jnp.arange(n_ele))
 
 
-def slice(pytree, a, b):
-    return jax.tree.map(operator.itemgetter(slice(a, b)), pytree)
+def slice(tree, a, b):
+    return jax.tree.map(operator.itemgetter(slice(a, b)), tree)
 
 
 # ---------------------------------------------------------------
@@ -101,25 +101,38 @@ def slice(pytree, a, b):
 # ---------------------------------------------------------------
 
 
-def add(pytree1, pytree2):
-    return jax.tree.map(jnp.add, pytree1, pytree2)
+def add(tree1, tree2):
+    return jax.tree.map(jnp.add, tree1, tree2)
 
 
-def neg(pytree):
-    return jax.tree.map(jnp.negative, pytree)
+def neg(tree):
+    return jax.tree.map(jnp.negative, tree)
 
 
-def sub(pytree1, pytree2):
-    return add(pytree1, neg(pytree2))
+def sub(tree1, tree2):
+    return add(tree1, neg(tree2))
 
 
-def invert(pytree):
-    return jax.tree.map(jnp.invert, pytree)
+def invert(tree):
+    return jax.tree.map(jnp.invert, tree)
 
 
-def mean(pytree, **kwargs):
-    return jax.tree.map(partial(jnp.mean, **kwargs), pytree)
+def mean(tree, **kwargs):
+    return jax.tree.map(partial(jnp.mean, **kwargs), tree)
 
 
-def std(pytree, **kwargs):
-    return jax.tree.map(partial(jnp.std, **kwargs), pytree)
+def std(tree, **kwargs):
+    return jax.tree.map(partial(jnp.std, **kwargs), tree)
+
+
+def cov(tree, **kwargs):
+    return jax.tree.map(partial(jnp.cov, **kwargs), tree)
+
+
+# ---------------------------------------------------------------
+# For testing
+# ---------------------------------------------------------------
+
+
+def allclose(tree1, tree2):
+    return jax.tree.all(jax.tree.map(jnp.allclose, tree1, tree2))
