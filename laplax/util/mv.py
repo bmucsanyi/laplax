@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from laplax.util.ops import lmap
-from laplax.util.tree import basis_vector_from_index, eye
+from laplax.util.tree import basis_vector_from_index, eye_like
 
 
 def diagonal(mv: Callable, size: int, tree: dict | None = None) -> jax.Array:
@@ -36,10 +36,9 @@ def diagonal(mv: Callable, size: int, tree: dict | None = None) -> jax.Array:
     return jnp.stack([mv(get_basis_vec(i))[i] for i in range(size)])
 
 
-def todense(mv: Callable, size: int, tree: dict | None = None) -> jax.Array:
+def todense(mv: Callable, like: dict | int | None = None) -> jax.Array:
     """Return dense matrix for mv-product."""
-    identity = eye(tree) if tree else jnp.eye(size)
-
+    identity = jnp.eye(like) if isinstance(like, int) else eye_like(like)
     return lmap(mv, identity)
 
 
