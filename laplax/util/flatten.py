@@ -20,6 +20,39 @@ def cumsum(seq):
     return [total := total + ele for ele in seq]
 
 
+def create_partial_pytree_flattener(tree: PyTree):
+    """Create flatten and unflatten functions for partial PyTree arrays.
+
+    Assumes an PyTree representing an array, where in each leaf the first
+    dimension gives the row index, while the remaining might need to be
+    flattened.
+    """
+
+    def flatten(tree: PyTree) -> jax.Array:
+        flat, _ = jax.tree_util.tree_flatten(tree)
+        return jnp.concatenate(
+            [leaf.reshape(leaf.shape[0], -1) for leaf in flat], axis=1
+        )
+
+    # Get shapes and tree def for unflattening
+    flat, tree_def = jax.tree_util.tree_flatten(tree)
+    all_shapes = [leaf.shape for leaf in flat]
+
+    def unflatten(arr: jax.Array) -> PyTree:
+        flat_vector_split = jnp.split(
+            arr, cumsum(math.prod(sh[1:]) for sh in all_shapes)[:-1], axis=1
+        )  # Ignore row indices in shape.
+        return jax.tree_util.tree_unflatten(
+            tree_def,
+            [
+                flat_vector_split[i].reshape(all_shapes[i])
+                for i in range(len(flat_vector_split))
+            ],
+        )
+
+    return flatten, unflatten
+
+
 def flatten_pytree(
     tree: PyTree,
 ) -> tuple[jax.Array, PyTreeDef, tuple[tuple]]:
