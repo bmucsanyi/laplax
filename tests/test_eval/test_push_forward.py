@@ -1,8 +1,10 @@
 import jax
+import jax.numpy as jnp
 from flax import nnx
 
 from laplax.curv.cov import create_full_cov
 from laplax.curv.ggn import create_ggn_mv
+from laplax.eval.push_forward import set_mc_pushforward
 from laplax.util.flatten import create_partial_pytree_flattener
 from laplax.util.mv import todense
 from laplax.util.tree import allclose, get_size, ones_like
@@ -50,13 +52,25 @@ def test_push_forward():
     n_params = get_size(params)
     ggn = todense(ggn_mv, like=params)
 
-    # Create flatten, unflatten
-    flatten, unflatten = create_partial_pytree_flattener(ggn)
-
     # Testing
     get_posterior = create_full_cov(ggn_mv, tree=params)
-    cov = get_posterior(prior_prec=1.0)
-    return ggn
+    cov = get_posterior(prior_prec=1.0, return_scale=True)
+
+    # Set pushforward
+    pushforward = set_mc_pushforward(
+        key=jax.random.key(0),
+        model_fn=model_fn,
+        mean=params,
+        posterior=get_posterior,
+        prior_prec=99999999.0,
+        n_weight_samples=100000,
+    )
+
+    # Compute pushforward
+    results = pushforward(data["input"])
+
+    jnp.allclose(model_fn(params, data["input"]), results["pred"])
+    jnp.allclose(model_fn(params, data["input"]), results["pred_mean"], rtol=1e-2)
 
 
 test_push_forward()
