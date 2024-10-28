@@ -1,5 +1,6 @@
 """Contains operations for flexible/adaptive compute."""
 
+import operator
 import os
 
 import jax
@@ -46,10 +47,16 @@ def precompute_list(func, _list):
     option = str_to_bool(os.getenv("LAPLAX_PRECOMPUTE_LIST", LAPLAX_PRECOMPUTE_LIST))
 
     if option:
+        # TODO(any): Check whether we want to have tree support or list support for batch.
         precompute_list = lmap(func, _list)
 
         def get_element(i):
-            return precompute_list[i]
+            return jax.tree.map(operator.itemgetter(i), precompute_list)
+
+        # precompute_list = [func(i) for i in _list]
+
+        # def get_element(i):
+        #    return precompute_list[i]
 
         return get_element
 
