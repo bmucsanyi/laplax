@@ -20,6 +20,32 @@ def cumsum(seq):
     return [total := total + ele for ele in seq]
 
 
+def create_pytree_flattener(tree: PyTree):
+    """Create flatten and unflatten functions for a one-dimensional (vector) PyTree."""
+
+    def flatten(tree: PyTree) -> jax.Array:
+        flat, _ = jax.tree.flatten(tree)
+        return jnp.concatenate([leaf.ravel() for leaf in flat])
+
+    # Get shapes and tree def for unflattening
+    flat, tree_def = jax.tree.flatten(tree)
+    all_shapes = [leaf.shape for leaf in flat]
+
+    def unflatten(arr: jax.Array) -> PyTree:
+        flat_vector_split = jnp.split(
+            arr, cumsum(math.prod(sh) for sh in all_shapes)[:-1]
+        )
+        return jax.tree.unflatten(
+            tree_def,
+            [
+                arr.reshape(sh)
+                for arr, sh in zip(flat_vector_split, all_shapes, strict=True)
+            ],
+        )
+
+    return flatten, unflatten
+
+
 def create_partial_pytree_flattener(tree: PyTree):
     """Create flatten and unflatten functions for partial PyTree arrays.
 
@@ -146,3 +172,31 @@ def inflate_and_flatten(flatten_fn: callable, inflate_fn: callable, argnums: int
         return wrapper
 
     return decorator
+
+
+def unravel_array_into_pytree(pytree, axis, arr):
+    """Unravel an array into a PyTree with a given structure.
+
+    Args:
+        pytree: The pytree that provides the structure.
+        axis: The parameter axis is either -1, 0, or 1.  It controls the
+          resulting shapes.
+        example: If specified, cast the components to the matching dtype/weak_type,
+          or else use the pytree leaf type if example is None.
+        arr: The array to be unraveled.
+
+    Reference: Following the implementation in jax._src.api._unravel_array_into_pytree
+    """
+    leaves, treedef = jax.tree.flatten(pytree)
+    axis %= arr.ndim
+    shapes = [arr.shape[:axis] + l.shape + arr.shape[axis + 1 :] for l in leaves]
+    parts = jnp.split(arr, cumsum(math.prod(leaf.shape) for leaf in leaves[:-1]), axis)
+    reshaped_parts = [x.reshape(shape) for x, shape in zip(parts, shapes, strict=True)]
+
+    return jax.tree.unflatten(treedef, reshaped_parts)
+
+
+def flatten_pytree_to_array(tree):
+    """Flatten a PyTree into a 1D array."""
+    flat, _ = jax.tree.flatten(tree)
+    return jnp.concatenate([x.ravel() for x in flat])
