@@ -94,7 +94,8 @@ def set_mc_pushforward(
     key: KeyType,
     model_fn: Callable,
     mean: PyTree,
-    scale_mv: Callable,
+    posterior: Callable,
+    prior_prec: float,
     n_weight_samples: int,
     pushforward_functions: dict = mc_finalize_pushforward,
     pushforward_default_boolean: dict = mc_finalize_pushforward_default_boolean,
@@ -106,6 +107,7 @@ def set_mc_pushforward(
 
     # Create sample function
     keys = jax.random.split(key, n_weight_samples)
+    scale_mv = posterior(prior_prec, return_scale=True)
 
     def get_weight_sample(idx):
         return get_normal_weight_samples(keys[idx], mean, scale_mv)
@@ -121,6 +123,6 @@ def set_mc_pushforward(
         pred = model_fn(params=mean, input=input)
         pred_ensemble = lmap(compute_pred_ptw, jnp.arange(n_weight_samples))
 
-        return finalize(pred, pred_ensemble)
+        return finalize(pred=pred, pred_ensemble=pred_ensemble)
 
     return prob_predictive
