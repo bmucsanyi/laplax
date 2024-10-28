@@ -1,12 +1,20 @@
 """Matrix-free array operations for matrix-vector products."""
 
 from collections.abc import Callable
+from functools import partial
 
 import jax
 import jax.numpy as jnp
 
+from laplax.types import PyTree
+from laplax.util.flatten import unravel_array_into_pytree
 from laplax.util.ops import lmap
-from laplax.util.tree import basis_vector_from_index, eye_like
+from laplax.util.tree import (
+    basis_vector_from_index,
+    eye_like,
+    tree_matvec,
+    tree_partialmatvec,
+)
 
 
 def diagonal(mv: Callable, size: int, tree: dict | None = None) -> jax.Array:
@@ -42,8 +50,36 @@ def todense(mv: Callable, like: dict | int | None = None) -> jax.Array:
     return lmap(mv, identity)
 
 
-def array_to_mv(arr: jax.Array) -> Callable:
+def todensetree(mv: Callable, tree: PyTree) -> PyTree:
+    """Return pytree-pytree for mv-product."""
+    identity = eye_like(tree)
+    mv_out = lmap(mv, identity)
+    return jax.tree.map(partial(unravel_array_into_pytree, tree, 0), mv_out)
+
+
+def array_to_mv(
+    arr: jax.Array,
+    flatten: Callable | None = None,
+    unflatten: Callable | None = None,
+) -> Callable:
     def _mv(vec):
-        return arr @ vec
+        if flatten:
+            vec = flatten(vec)
+        vec = arr @ vec
+        return vec if unflatten is None else unflatten(vec)
+
+    return _mv
+
+
+def tree_to_mv(tree: PyTree) -> Callable:
+    def _mv(vec):
+        return tree_matvec(tree, vec)
+
+    return _mv
+
+
+def partialtree_to_mv(tree: PyTree) -> Callable:
+    def _mv(vec):
+        return tree_partialmatvec(tree, vec)
 
     return _mv

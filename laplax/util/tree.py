@@ -8,6 +8,7 @@ from itertools import starmap
 import jax
 import jax.numpy as jnp
 
+from laplax.util.flatten import unravel_array_into_pytree
 from laplax.util.ops import lmap
 
 # ---------------------------------------------------------------
@@ -44,15 +45,19 @@ def randn_like(key, tree):
         (PyTree) : A PyTree of random numbers with the same structure
             and shape as `pytree`.
     """
-    # Split the key according to number of leaves
-    keys = jax.random.split(key, len(jax.tree_util.tree_leaves(tree)))
+    # Flatten the tree
+    leaves, treedef = jax.tree.flatten(tree)
 
-    # Define a random number generator
-    def generate_random_leaf(leaf, subkey):
-        return jax.random.normal(subkey, shape=leaf.shape)
+    # Split key
+    keys = jax.random.split(key, len(leaves))
 
-    # Apply the function to each leaf of the pytree.
-    return jax.tree.map(generate_random_leaf, tree, keys)
+    # Generate random numbers
+    random_leaves = [
+        jax.random.normal(k, shape=leaf.shape)
+        for k, leaf in zip(keys, leaves, strict=True)
+    ]
+
+    return jax.tree.unflatten(treedef, random_leaves)
 
 
 def basis_vector_from_index(idx, tree):
@@ -87,9 +92,13 @@ def basis_vector_from_index(idx, tree):
     return jax.tree_util.tree_unflatten(tree_def, updated_flat)
 
 
-def eye_like(tree):
+def eye_like_with_basis_vector(tree):
     n_ele = get_size(tree)
     return lmap(partial(basis_vector_from_index, tree=tree), jnp.arange(n_ele))
+
+
+def eye_like(tree):
+    return unravel_array_into_pytree(tree, 1, jnp.eye(get_size(tree)))
 
 
 def slice(tree, a, b):
@@ -125,8 +134,42 @@ def std(tree, **kwargs):
     return jax.tree.map(partial(jnp.std, **kwargs), tree)
 
 
+def var(tree, **kwargs):
+    return jax.tree.map(partial(jnp.var, **kwargs), tree)
+
+
 def cov(tree, **kwargs):
     return jax.tree.map(partial(jnp.cov, **kwargs), tree)
+
+
+def tree_matvec(tree, vector):
+    # Flatten the vector
+    vec_flatten, vec_def = jax.tree.flatten(vector)
+    n_vec_flatten = len(vec_flatten)
+
+    # Array flattening and reshaping
+    arr_flatten, _ = jax.tree.flatten(tree)
+    arr_flatten = [
+        jnp.concatenate(
+            [
+                arr_flatten[i * n_vec_flatten + j].reshape(*vec_flatten[j].shape, -1)
+                for i in range(n_vec_flatten)
+            ],
+            axis=-1,
+        )
+        for j in range(n_vec_flatten)
+    ]
+
+    # Array, vector to correct shape
+    tree = jax.tree.unflatten(vec_def, arr_flatten)
+    vec_flatten = jnp.concatenate([v.reshape(-1) for v in vec_flatten])
+
+    # Apply matmul
+    return jax.tree.map(lambda p: p @ vec_flatten, tree)
+
+
+def tree_partialmatvec(tree, vector):
+    return jax.tree.map(lambda arr: arr @ vector, tree)
 
 
 # ---------------------------------------------------------------
