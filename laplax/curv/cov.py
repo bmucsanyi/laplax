@@ -5,8 +5,8 @@ import jax.numpy as jnp
 
 from laplax.curv.low_rank import get_low_rank, inv_low_rank_plus_diagonal_mv_factory
 from laplax.types import Callable, PyTree
-from laplax.util.flatten import create_partial_pytree_flattener
-from laplax.util.mv import array_to_mv, diagonal, todense
+from laplax.util.flatten import create_partial_pytree_flattener, create_pytree_flattener
+from laplax.util.mv import array_to_mv, diagonal, todense, todensetree
 
 # -----------------------------------------------------------------------
 # FULL
@@ -36,16 +36,17 @@ def create_full_cov(mv: Callable, tree: PyTree):
     For inverting we flatten the PyTree and apply unflattening after.
     """
     # Get dense curvature estimate
-    curv_est = todense(mv, like=tree)
-    flatten, unflatten = create_partial_pytree_flattener(curv_est)
-    curv_est = flatten(curv_est)
+    curv_est = todense(mv, like=tree)  # Switched from todense to todensetree
+    flatten_partial_tree, _ = create_partial_pytree_flattener(curv_est)
+    flatten, unflatten = create_pytree_flattener(tree)
+    curv_est = flatten_partial_tree(curv_est)
 
     def get_posterior(prior_prec, return_scale=False):
         prec = curv_est + prior_prec * jnp.eye(curv_est.shape[-1])
         scale = prec_to_scale(prec)
         if return_scale:
-            return array_to_mv(unflatten(scale))
-        return array_to_mv(unflatten(scale @ scale.T))
+            array_to_mv(scale, flatten, unflatten)
+        return array_to_mv(scale, flatten, unflatten)
 
     return get_posterior
 
