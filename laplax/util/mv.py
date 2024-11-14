@@ -17,7 +17,9 @@ from laplax.util.tree import (
 )
 
 
-def diagonal(mv: Callable, size: int, tree: dict | None = None) -> jax.Array:
+def diagonal(
+    mv: Callable | jax.Array, size: int, tree: dict | None = None
+) -> jax.Array:
     """Return the diagonal of a PyTree-based matrix-vector-product.
 
     Args:
@@ -28,6 +30,9 @@ def diagonal(mv: Callable, size: int, tree: dict | None = None) -> jax.Array:
     Return:
         jax.Array: Diagonal of the matrix-free matrix.
     """
+    if isinstance(mv, jnp.ndarray):  # Q: Allow arr as diagonal
+        return jnp.diag(mv)
+
     if tree:
 
         @jax.jit

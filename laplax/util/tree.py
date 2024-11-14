@@ -101,7 +101,7 @@ def eye_like(tree):
     return unravel_array_into_pytree(tree, 1, jnp.eye(get_size(tree)))
 
 
-def slice(tree, a, b):
+def tree_slice(tree, a, b):
     return jax.tree.map(operator.itemgetter(slice(a, b)), tree)
 
 

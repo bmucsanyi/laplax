@@ -4,10 +4,7 @@ from flax import nnx
 
 from laplax.curv.cov import create_full_cov
 from laplax.curv.ggn import create_ggn_mv
-from laplax.eval.push_forward import set_mc_pushforward
-from laplax.util.flatten import create_partial_pytree_flattener
-from laplax.util.mv import todense
-from laplax.util.tree import allclose, get_size, ones_like
+from laplax.eval.push_forward import set_lin_pushforward, set_mc_pushforward
 
 
 def load_simple_model():
@@ -39,7 +36,7 @@ def load_simple_model():
     return model, data
 
 
-def test_push_forward():
+def test_mc_push_forward():
     # Create simple model
     model, data = load_simple_model()
     graph_def, params = nnx.split(model)
@@ -47,14 +44,9 @@ def test_push_forward():
     def model_fn(params, input):
         return nnx.call((graph_def, params))(input)[0]
 
-    # Calculate ggn
+    # Set posterior function
     ggn_mv = create_ggn_mv(model_fn, params, data, "mse")
-    n_params = get_size(params)
-    ggn = todense(ggn_mv, like=params)
-
-    # Testing
     get_posterior = create_full_cov(ggn_mv, tree=params)
-    cov = get_posterior(prior_prec=1.0, return_scale=True)
 
     # Set pushforward
     pushforward = set_mc_pushforward(
@@ -66,11 +58,46 @@ def test_push_forward():
         n_weight_samples=100000,
     )
 
-    # Compute pushforward
+    # Compute pushforwards
+    pushforward = jax.jit(pushforward)
     results = pushforward(data["input"])
 
-    jnp.allclose(model_fn(params, data["input"]), results["pred"])
-    jnp.allclose(model_fn(params, data["input"]), results["pred_mean"], rtol=1e-2)
+    # Check results
+    pred = model_fn(params, data["input"])
+    assert (5, *pred.shape) == results["samples"].shape  # Check shape
+    assert results["pred_std"] > 0
+    jnp.allclose(pred, results["pred"])
+    jnp.allclose(pred, results["pred_mean"], rtol=1e-2)
 
 
-test_push_forward()
+def test_lin_push_forward():
+    # Create simple model
+    model, data = load_simple_model()
+    graph_def, params = nnx.split(model)
+
+    def model_fn(params, input):
+        return nnx.call((graph_def, params))(input)[0]
+
+    # Calculate ggn
+    ggn_mv = create_ggn_mv(model_fn, params, data, "mse")
+    get_posterior = create_full_cov(ggn_mv, tree=params)
+
+    # Set pushforward
+    pushforward = set_lin_pushforward(
+        key=jax.random.key(0),
+        model_fn=model_fn,
+        mean=params,
+        posterior=get_posterior,
+        prior_prec=99999999.0,
+        n_samples=5,  # TODO(2bys): Find a better way of setting this.
+    )
+
+    # Compute pushforward
+    pushforward = jax.jit(pushforward)
+    results = pushforward(data["input"])
+
+    # Check results
+    pred = model_fn(params, data["input"])
+    assert (5, *pred.shape) == results["samples"].shape  # Check shape
+    jnp.allclose(pred, results["pred"])
+    jnp.allclose(pred, results["pred_mean"], rtol=1e-2)

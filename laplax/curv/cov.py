@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from laplax.curv.low_rank import get_low_rank, inv_low_rank_plus_diagonal_mv_factory
 from laplax.types import Callable, PyTree
 from laplax.util.flatten import create_partial_pytree_flattener, create_pytree_flattener
-from laplax.util.mv import array_to_mv, diagonal, todense, todensetree
+from laplax.util.mv import array_to_mv, diagonal, todense
 
 # -----------------------------------------------------------------------
 # FULL
@@ -44,9 +44,12 @@ def create_full_cov(mv: Callable, tree: PyTree):
     def get_posterior(prior_prec, return_scale=False):
         prec = curv_est + prior_prec * jnp.eye(curv_est.shape[-1])
         scale = prec_to_scale(prec)
-        if return_scale:
-            array_to_mv(scale, flatten, unflatten)
-        return array_to_mv(scale, flatten, unflatten)
+        return {
+            "cov_mv": array_to_mv(scale, flatten, unflatten),
+            "scale_mv": array_to_mv(scale, flatten, unflatten)
+            if return_scale
+            else None,
+        }
 
     return get_posterior
 
