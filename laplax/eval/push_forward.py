@@ -52,7 +52,7 @@ def set_get_weight_sample(key, mean, scale_mv, n_weight_samples):
 
 
 def mc_pred_mean_fn(**kwargs):
-    return util.tree.util.mean(kwargs.get("pred_ensemble"), axis=0)
+    return util.tree.mean(kwargs.get("pred_ensemble"), axis=0)
 
 
 def mc_pred_cov_fn(**kwargs):
@@ -116,7 +116,7 @@ def set_mc_pushforward(  # noqa: PLR0913, PLR0917
     mc_pushforward_functions: dict = DEFAULT_MC_FUNCTIONS,
 ) -> Callable:
     # Create weight sample function
-    scale_mv = posterior(prior_prec, return_scale=True)["scale_mv"]
+    scale_mv = posterior(prior_prec=prior_prec, return_scale=True)["scale_mv"]
     get_weight_sample = set_get_weight_sample(
         key,
         mean,
@@ -214,7 +214,7 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
 ) -> Callable:
     # Create mv function
     mv = posterior(
-        prior_prec,
+        prior_prec=prior_prec,
         return_scale=("samples" in linearized_pushforward_functions),
     )
 

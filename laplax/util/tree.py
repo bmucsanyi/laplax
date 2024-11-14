@@ -105,6 +105,15 @@ def tree_slice(tree, a, b):
     return jax.tree.map(operator.itemgetter(slice(a, b)), tree)
 
 
+def tree_vec_get(tree, idx):
+    if isinstance(tree, jnp.ndarray):
+        return tree[idx]  # Also works with arrays.
+    # Column flat and get index
+    flat, _ = jax.tree_util.tree_flatten(tree)
+    flat = jnp.concatenate([f.reshape(-1) for f in flat])
+    return flat[idx]
+
+
 # ---------------------------------------------------------------
 # Tree operations
 # ---------------------------------------------------------------

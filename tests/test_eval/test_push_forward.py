@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from flax import nnx
 
-from laplax.curv.cov import create_full_cov
+from laplax.curv.cov import create_posterior_function
 from laplax.curv.ggn import create_ggn_mv
 from laplax.eval.push_forward import set_lin_pushforward, set_mc_pushforward
 
@@ -46,7 +46,7 @@ def test_mc_push_forward():
 
     # Set posterior function
     ggn_mv = create_ggn_mv(model_fn, params, data, "mse")
-    get_posterior = create_full_cov(ggn_mv, tree=params)
+    get_posterior = create_posterior_function("diagonal", mv=ggn_mv, tree=params)
 
     # Set pushforward
     pushforward = set_mc_pushforward(
@@ -80,7 +80,7 @@ def test_lin_push_forward():
 
     # Calculate ggn
     ggn_mv = create_ggn_mv(model_fn, params, data, "mse")
-    get_posterior = create_full_cov(ggn_mv, tree=params)
+    get_posterior = create_posterior_function("diagonal", ggn_mv, tree=params)
 
     # Set pushforward
     pushforward = set_lin_pushforward(

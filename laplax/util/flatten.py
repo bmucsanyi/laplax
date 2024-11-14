@@ -38,8 +38,8 @@ def create_pytree_flattener(tree: PyTree):
         return jax.tree.unflatten(
             tree_def,
             [
-                arr.reshape(sh)
-                for arr, sh in zip(flat_vector_split, all_shapes, strict=True)
+                a.reshape(sh)
+                for a, sh in zip(flat_vector_split, all_shapes, strict=True)
             ],
         )
 
@@ -152,6 +152,26 @@ def flatten_hessian(hessian_pytree: PyTree, params_pytree: PyTree) -> jax.Array:
     )
 
     return full_hessian
+
+
+def wrap_function(
+    fn: callable,
+    input_fn: callable,
+    output_fn: callable,
+    argnums: int = 0,
+):
+    def wrapper(*args, **kwargs):  # noqa: ANN002
+        # Call the original function on transformed input
+        result = fn(
+            *args[:argnums], input_fn(args[argnums]), *args[argnums + 1 :], **kwargs
+        )
+
+        # Flatten the output
+        flat_output = output_fn(result)
+
+        return flat_output
+
+    return wrapper
 
 
 def inflate_and_flatten(flatten_fn: callable, inflate_fn: callable, argnums: int = 0):
