@@ -97,9 +97,9 @@ class Regression:
                 self.final_activation = lambda x: x  # Identity for simplicity
 
             def __call__(self, x):
-                # Apply layers sequentially with activation
                 for layer in self.layers[:-1]:
-                    x = self.activation(layer(x))
+                    x = layer(x)
+                    x = self.activation(x)
                 return self.final_activation(self.layers[-1](x))
 
         key = jax.random.key(2)
@@ -110,16 +110,35 @@ class Regression:
         keys = [jax.random.key(0), jax.random.key(1)]
         model = MLP(keys=keys, in_channels=10, hidden_channels=20, out_channels=1)
 
-        def model_fn(params, input): # Enforce batch size and input dimensions
+        def model_fn(params, input):
+            if input.ndim == 1:
+                input = jnp.expand_dims(input, axis=0)
+                # Enforce batch size and input dimensions
             new_model = eqx.tree_at(lambda m: m, model, params)
-            return new_model(input)
+            return jax.vmap(new_model)(input)
 
         params = eqx.filter(model, eqx.is_inexact_array)
         return model_fn, data, params
 
 class Classification:
 # use for one of: "linen", "nnx" or "equinox
+    def case_linen(self):
 
+    class CNN(nnx.Module):
+        """A simple CNN model."""
+
+        def __init__(self, rngs: nnx.Rngs):
+            self.conv1 = nnx.Conv(1, 2, kernel_size=(3, 3), rngs=rngs)
+            self.avg_pool = partial(nnx.avg_pool, window_shape=(2, 2), strides=(2, 2))
+            self.linear1 = nnx.Linear(32, 10, rngs=rngs)
+
+        def __call__(self, x):
+            if x.ndim == 3:
+                x = jnp.expand_dims(x, axis=0)
+            x = self.avg_pool(nnx.relu(self.conv1(x)))
+            x = x.reshape(x.shape[0], -1)  # flatten
+            x = nnx.relu(self.linear1(x))
+            return x
     def case_nnx(self):
         class CNN(nnx.Module):
             """A simple CNN model."""
@@ -180,7 +199,7 @@ class Classification:
         return model, data
         
 """
-@parametrize_with_cases("model_fn, data, params", cases=[Classification])
+@parametrize_with_cases("model_fn, data, params", cases=[Regression, Classification])
 def test_push_forward(model_fn, data, params):
     # Calculate ggn
     ggn_mv = create_ggn_mv(model_fn, params, data, "mse")
