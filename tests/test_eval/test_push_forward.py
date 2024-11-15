@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from flax import nnx
 
-from typing import List, Callable
+from typing import List, Callable, Any
 from laplax.curv.cov import create_full_cov
 from laplax.curv.ggn import create_ggn_mv
 from laplax.eval.push_forward import set_mc_pushforward
@@ -123,22 +123,49 @@ class Regression:
 class Classification:
 # use for one of: "linen", "nnx" or "equinox
     def case_linen(self):
+        class CNN(nn.Module):
+            def setup(self):
+                self.conv1 = nn.Conv(features=2, kernel_size=(3, 3))  # Conv2D layer
+                self.linear1 = nn.Dense(features=10)  # Dense (fully connected) layer
 
-    class CNN(nnx.Module):
-        """A simple CNN model."""
+            def __call__(self, x):
+                # Ensure x has 4 dimensions (batch_size, height, width, channels)
+                if x.ndim == 3:
+                    x = jnp.expand_dims(x, axis=0)
 
-        def __init__(self, rngs: nnx.Rngs):
-            self.conv1 = nnx.Conv(1, 2, kernel_size=(3, 3), rngs=rngs)
-            self.avg_pool = partial(nnx.avg_pool, window_shape=(2, 2), strides=(2, 2))
-            self.linear1 = nnx.Linear(32, 10, rngs=rngs)
+                # Apply convolution, ReLU, and average pooling
+                x = nn.relu(self.conv1(x))
+                x = nn.avg_pool(x, window_shape=(2, 2), strides=(2, 2))
 
-        def __call__(self, x):
-            if x.ndim == 3:
-                x = jnp.expand_dims(x, axis=0)
-            x = self.avg_pool(nnx.relu(self.conv1(x)))
-            x = x.reshape(x.shape[0], -1)  # flatten
-            x = nnx.relu(self.linear1(x))
-            return x
+                # Flatten spatial dimensions
+                x = x.reshape((x.shape[0], -1))  # Shape: (batch_size, flattened_features)
+
+                # Apply dense layer and ReLU
+                x = nn.relu(self.linear1(x))
+
+                return x
+
+        key = jax.random.key(0)
+        rngs = nnx.Rngs(0)
+        data = {
+            # Single grayscale image with shape (1, 8, 8, 1) for batch size 1
+            "input": jax.random.normal(key, (1, 8, 8, 1)),
+
+            # Random one-hot target with 10 classes
+            "target": jax.nn.one_hot(jax.random.randint(key, (1,), 0, 10), num_classes=10),
+        }
+
+        model = CNN()
+        rng_key = random.key(711)
+        parameters = model.init(rng_key, random.normal(key, (1, 8, 8, 1)))
+
+        def model_fn(params, input):
+            return model.apply(params, input)
+
+        params = parameters
+
+        return model_fn, data, params
+
     def case_nnx(self):
         class CNN(nnx.Module):
             """A simple CNN model."""
@@ -199,7 +226,7 @@ class Classification:
         return model, data
         
 """
-@parametrize_with_cases("model_fn, data, params", cases=[Regression, Classification])
+@parametrize_with_cases("model_fn, data, params", cases=[Classification])
 def test_push_forward(model_fn, data, params):
     # Calculate ggn
     ggn_mv = create_ggn_mv(model_fn, params, data, "mse")
