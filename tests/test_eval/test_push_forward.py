@@ -17,7 +17,7 @@ from .cases.regression import case_regression
 def test_mc_push_forward(curv_op, task):
     model_fn = task.get_model_fn()
     params = task.get_parameters()
-    data = task.get_data_batch(batch_size=1)
+    data = task.get_data_batch(batch_size=20)
 
     # Set get posterior function
     ggn_mv = create_ggn_mv(model_fn, params, data, task.loss_fn_type)
@@ -46,9 +46,8 @@ def test_mc_push_forward(curv_op, task):
     # # Check results
     pred = jax.vmap(lambda x: model_fn(params, x))(data["input"])
     assert (5, task.out_channels) == results["samples"].shape[1:]  # Check shape
-    assert results["pred_std"] > 0
-    jnp.allclose(pred, results["pred"])
-    # jnp.allclose(pred, results["pred_mean"], rtol=1e-2)
+    assert jnp.all(results["pred_std"] > 0)
+    assert jnp.allclose(pred, results["pred"])
 
 
 @pytest_cases.parametrize(
@@ -59,7 +58,7 @@ def test_mc_push_forward(curv_op, task):
 def test_lin_push_forward(curv_op, task):
     model_fn = task.get_model_fn()
     params = task.get_parameters()
-    data = task.get_data_batch(batch_size=1)
+    data = task.get_data_batch(batch_size=20)
 
     # Set get posterior function
     ggn_mv = create_ggn_mv(model_fn, params, data, task.loss_fn_type)
