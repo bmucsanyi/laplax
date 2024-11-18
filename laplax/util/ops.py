@@ -53,11 +53,6 @@ def precompute_list(func, _list):
         def get_element(i):
             return jax.tree.map(operator.itemgetter(i), precompute_list)
 
-        # precompute_list = [func(i) for i in _list]
-
-        # def get_element(i):
-        #    return precompute_list[i]
-
         return get_element
 
     return func

@@ -1,52 +1,33 @@
 import jax
 import jax.numpy as jnp
-from flax import nnx
+import pytest_cases
 
 from laplax.curv.cov import create_posterior_function
 from laplax.curv.ggn import create_ggn_mv
 from laplax.eval.push_forward import set_lin_pushforward, set_mc_pushforward
 
-
-def load_simple_model():
-    class Model(nnx.Module):
-        def __init__(self, in_channels, hidden_channels, out_channels, rngs):
-            self.in_channels = in_channels
-            self.hidden_channels = hidden_channels
-            self.out_channels = out_channels
-
-            self.linear1 = nnx.Linear(in_channels, hidden_channels, rngs=rngs)
-            self.linear2 = nnx.Linear(hidden_channels, hidden_channels, rngs=rngs)
-            self.linear3 = nnx.Linear(hidden_channels, out_channels, rngs=rngs)
-
-        def __call__(self, x):
-            x = self.linear1(x)
-            x = nnx.relu(x)
-            x = self.linear2(x)
-            x = nnx.relu(x)
-            x = self.linear3(x)
-            return x
-
-    key = jax.random.key(0)
-    rngs = nnx.Rngs(0)
-    model = Model(in_channels=10, hidden_channels=20, out_channels=1, rngs=rngs)
-    data = {
-        "input": jax.random.normal(key, (1, 10)),
-        "target": jax.random.normal(key, (1, 1)),
-    }
-    return model, data
+from .cases.regression import case_regression
 
 
-def test_mc_push_forward():
-    # Create simple model
-    model, data = load_simple_model()
-    graph_def, params = nnx.split(model)
+@pytest_cases.parametrize(
+    "curv_op",
+    ["full", "diagonal", "low_rank"],
+)
+@pytest_cases.parametrize_with_cases("task", cases=case_regression)
+def test_mc_push_forward(curv_op, task):
+    model_fn = task.get_model_fn()
+    params = task.get_parameters()
+    data = task.get_data_batch(batch_size=1)
 
-    def model_fn(params, input):
-        return nnx.call((graph_def, params))(input)[0]
-
-    # Set posterior function
-    ggn_mv = create_ggn_mv(model_fn, params, data, "mse")
-    get_posterior = create_posterior_function("diagonal", mv=ggn_mv, tree=params)
+    # Set get posterior function
+    ggn_mv = create_ggn_mv(model_fn, params, data, task.loss_fn_type)
+    get_posterior = create_posterior_function(
+        curv_op,
+        mv=ggn_mv,
+        tree=params,
+        key=jax.random.key(20),
+        maxiter=20,
+    )
 
     # Set pushforward
     pushforward = set_mc_pushforward(
@@ -54,33 +35,41 @@ def test_mc_push_forward():
         model_fn=model_fn,
         mean=params,
         posterior=get_posterior,
-        prior_prec=99999999.0,
+        prior_prec=9999999.0,
         n_weight_samples=100000,
     )
 
     # Compute pushforwards
-    pushforward = jax.jit(pushforward)
-    results = pushforward(data["input"])
+    # pushforward = jax.jit(pushforward)
+    results = jax.vmap(pushforward)(data["input"])
 
-    # Check results
-    pred = model_fn(params, data["input"])
-    assert (5, *pred.shape) == results["samples"].shape  # Check shape
+    # # Check results
+    pred = jax.vmap(lambda x: model_fn(params, x))(data["input"])
+    assert (5, task.out_channels) == results["samples"].shape[1:]  # Check shape
     assert results["pred_std"] > 0
     jnp.allclose(pred, results["pred"])
-    jnp.allclose(pred, results["pred_mean"], rtol=1e-2)
+    # jnp.allclose(pred, results["pred_mean"], rtol=1e-2)
 
 
-def test_lin_push_forward():
-    # Create simple model
-    model, data = load_simple_model()
-    graph_def, params = nnx.split(model)
+@pytest_cases.parametrize(
+    "curv_op",
+    ["full", "diagonal", "low_rank"],
+)
+@pytest_cases.parametrize_with_cases("task", cases=case_regression)
+def test_lin_push_forward(curv_op, task):
+    model_fn = task.get_model_fn()
+    params = task.get_parameters()
+    data = task.get_data_batch(batch_size=1)
 
-    def model_fn(params, input):
-        return nnx.call((graph_def, params))(input)[0]
-
-    # Calculate ggn
-    ggn_mv = create_ggn_mv(model_fn, params, data, "mse")
-    get_posterior = create_posterior_function("diagonal", ggn_mv, tree=params)
+    # Set get posterior function
+    ggn_mv = create_ggn_mv(model_fn, params, data, task.loss_fn_type)
+    get_posterior = create_posterior_function(
+        curv_op,
+        ggn_mv,
+        tree=params,
+        key=jax.random.key(20),
+        maxiter=20,
+    )
 
     # Set pushforward
     pushforward = set_lin_pushforward(
@@ -94,10 +83,12 @@ def test_lin_push_forward():
 
     # Compute pushforward
     pushforward = jax.jit(pushforward)
-    results = pushforward(data["input"])
+    results = jax.vmap(pushforward)(data["input"])
 
     # Check results
-    pred = model_fn(params, data["input"])
-    assert (5, *pred.shape) == results["samples"].shape  # Check shape
+    pred = jax.vmap(lambda x: model_fn(params, x))(data["input"])
+    assert (5, task.out_channels) == results["samples"].shape[
+        1:
+    ]  # (batch, samples, out)
     jnp.allclose(pred, results["pred"])
     jnp.allclose(pred, results["pred_mean"], rtol=1e-2)

@@ -113,8 +113,6 @@ def calculate_bin_metrics(
 # Regression metrics
 # --------------------------------------------------------------------------------
 
-# REGRESSION METRICS
-
 
 def estimate_q(
     pred_mean: jnp.ndarray,
