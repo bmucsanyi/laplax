@@ -179,28 +179,3 @@ def case_regression(
     """Test regression tasks with multiple frameworks and parameter combinations."""
     seed = 42
     return task_class(in_channels, hidden_channels, out_channels, seed)
-
-
-# Example Usage
-# if __name__ == "__main__":
-#     # Linen Example
-#     linen_model = LinenRegressionTask(10, 20, 1, seed=42, framework="linen")
-#     linen_model_fn = linen_model.get_model_fn()
-#     linen_data = linen_model.get_data_batch(batch_size=5)
-#     linen_params = linen_model.get_parameters()
-
-#     # NNX Example
-#     nnx_model = NNXRegressionTask(10, 20, 1, seed=42, framework="nnx")
-#     nnx_model_fn = nnx_model.get_model_fn()
-#     nnx_data = nnx_model.get_data_batch(batch_size=5)
-#     nnx_params = nnx_model.get_parameters()
-
-#     # Equinox Example
-#     equinox_model = EquinoxRegressionTask(10, 20, 1, seed=42, framework="equinox")
-#     equinox_model_fn = equinox_model.get_model_fn()
-#     equinox_data = equinox_model.get_data_batch(batch_size=5)
-#     equinox_params = equinox_model.get_parameters()
-
-#     print("Linen Params:", linen_params)
-#     print("NNX Params:", nnx_params)
-#     print("Equinox Params:", equinox_params)

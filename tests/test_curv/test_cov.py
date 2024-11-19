@@ -4,14 +4,16 @@ import numpy as np
 import pytest
 import pytest_cases
 
+from laplax import util
 from laplax.curv.cov import (
-    # create_diagonal_cov,
-    # create_full_cov,
-    # create_low_rank_cov,
+    CURVATURE_COV_METHODS,
+    CURVATURE_INVERSE_METHODS,
+    CURVATURE_METHODS,
+    CURVATURE_PRIOR_METHODS,
     prec_to_scale,
 )
 
-# from laplax.util.mv import array_to_mv
+from .cases.covariance import case_posterior_covariance
 
 
 @pytest.fixture(
@@ -58,3 +60,44 @@ def test_prec_to_scale_invalid(invalid_prec):
     """Test `prec_to_scale` for invalid input."""
     with pytest.raises(ValueError, match="Matrix is not positive definite"):
         prec_to_scale(invalid_prec)
+
+
+@pytest_cases.parametrize_with_cases("task", cases=case_posterior_covariance)
+def test_posterior_covariance_est(task):
+    # Get low rank terms
+    curv_est = CURVATURE_METHODS[task.method](
+        mv=task.arr_mv,
+        tree=task.tree_like,
+        key=task.key_curv_est,
+        maxiter=task.rank,
+    )
+    assert jnp.allclose(
+        task.adjust_curv_est(curv_est),
+        task.true_curv,
+        atol=1e-6,
+        rtol=1e-6,
+    )
+
+    # Get and test precision matrix
+    prec = CURVATURE_PRIOR_METHODS[task.method](curv_est, prior_prec=1.0)
+    prec_dense = task.adjust_prec(prec)
+    assert jnp.allclose(
+        prec_dense, task.true_curv + jnp.eye(task.size), atol=1e-6, rtol=1e-6
+    )
+
+    # Get and test scale matrix
+    scale_mv, state = CURVATURE_INVERSE_METHODS[task.method](prec)
+    scale_dense = util.mv.todense(scale_mv, like=task.tree_like)
+    assert jnp.allclose(
+        scale_dense @ scale_dense.T @ prec_dense,
+        jnp.eye(task.size),
+        atol=1e-6,
+        rtol=1e-6,
+    )
+
+    # Get and test covariance matrix
+    cov_mv = CURVATURE_COV_METHODS[task.method](state)
+    cov_dense = util.mv.todense(cov_mv, like=task.tree_like)
+    assert jnp.allclose(
+        cov_dense @ prec_dense, jnp.eye(task.size), atol=1e-6, rtol=1e-6
+    )

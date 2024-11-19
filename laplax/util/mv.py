@@ -39,7 +39,7 @@ def diagonal(
     if isinstance(mv, jnp.ndarray):  # Q: Allow arr as diagonal
         return jnp.diag(mv)
 
-    if tree:
+    if tree is not None:
         size = get_size(tree)
 
         @jax.jit
@@ -61,7 +61,9 @@ def diagonal(
 def todense(mv: Callable, like: dict | int | None = None) -> jax.Array:
     """Return dense matrix for mv-product."""
     identity = jnp.eye(like) if isinstance(like, int) else eye_like(like)
-    return lmap(mv, identity)
+    return jax.tree.map(
+        jnp.transpose, lmap(mv, identity)
+    )  # Lmap shares along the first axis (rows instead of columns).
 
 
 def todensetree(mv: Callable, tree: PyTree) -> PyTree:

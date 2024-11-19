@@ -75,12 +75,12 @@ def diag_with_prior(curv_est: jax.Array, **kwargs):
 
 
 def diag_to_scale(arr: jax.Array):
-    diag_inv = jnp.reciprocal(arr)
+    diag_sqrt_inv = jnp.sqrt(jnp.reciprocal(arr))
 
     def diag_mv(vec):
-        return diag_inv * vec
+        return diag_sqrt_inv * vec
 
-    return diag_mv, diag_inv
+    return diag_mv, diag_sqrt_inv
 
 
 def diag_scale_to_cov(arr: jax.Array):
