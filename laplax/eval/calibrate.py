@@ -102,6 +102,10 @@ def optimize_prior_prec(
         num=grid_size,
         dtype=laplax_dtype(),
     )
-    prior_prec = grid_search(prior_prec_interval, objective, data)
+    prior_prec = grid_search(
+        prior_prec_interval,
+        objective,
+        data,
+    )
 
     return prior_prec

@@ -131,6 +131,10 @@ def sub(tree1, tree2):
     return add(tree1, neg(tree2))
 
 
+def sqrt(tree):
+    return jax.tree.map(jnp.sqrt, tree)
+
+
 def invert(tree):
     return jax.tree.map(jnp.invert, tree)
 

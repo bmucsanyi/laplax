@@ -11,18 +11,13 @@ import jax
 import jax.numpy as jnp
 
 from laplax import util
+from laplax.eval.utils import finalize_functions
 from laplax.types import Callable, KeyType, PyTree
 from laplax.util.ops import lmap, precompute_list
 
 # -------------------------------------------------------------------------
 # General utilities
 # -------------------------------------------------------------------------
-
-
-def finalize_functions(functions: OrderedDict, results: dict, **kwargs):
-    for name, func in functions.items():
-        results[name] = func(**results, **kwargs)
-    return results
 
 
 def pred_fn(**kwargs):
@@ -71,7 +66,7 @@ def mc_pred_var_fn(**kwargs):
     return (
         jnp.diagonal(cov)
         if cov is not None
-        else util.tree.var(kwargs.get("pred_ensemble"))
+        else util.tree.var(kwargs.get("pred_ensemble"), axis=0)
     )
 
 
@@ -161,7 +156,7 @@ def lin_pred_var_fn(**kwargs):
 
 def lin_pred_std_fn(**kwargs):
     _var = kwargs.get("pred_var", lin_pred_var_fn(**kwargs))
-    return util.tree.std(_var)
+    return util.tree.sqrt(_var)
 
 
 def lin_pred_cov_fn(**kwargs):
