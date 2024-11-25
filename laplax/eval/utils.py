@@ -1,10 +1,22 @@
 # noqa: D100
+from collections import OrderedDict
 from collections.abc import Callable
 from typing import Any
 
 import jax
 
 from laplax.util.ops import lmap
+
+
+def finalize_functions(functions: OrderedDict, results: dict, **kwargs):
+    """Finalize functions.
+
+    Scans over ordered dictionary of functions (metrics, pushforwards, ...) and fills
+    in the results dictionary. Relevant function values are passed as kwargs.
+    """
+    for name, func in functions.items():
+        results[name] = func(**results, **kwargs)
+    return results
 
 
 def get_predictions_for_data_point_fn():
@@ -16,10 +28,6 @@ def get_predictions_for_data_point_fn():
     return get_predictions_for_data_point
 
 
-def _aslist(obj: Any) -> list[Any]:
-    return obj if isinstance(obj, list) else [obj]
-
-
 def identity(x: Any) -> Any:
     return x
 
@@ -28,7 +36,7 @@ def evaluate_metrics_on_dataset(  # noqa: D417
     pred_fn: Callable,
     data: tuple[jax.Array],
     *,
-    metrics: list[Callable] | Callable,
+    metrics: OrderedDict[Callable],
     apply: Callable = identity,
 ) -> dict:
     """Evaluate metrics on a dataset.
@@ -44,9 +52,8 @@ def evaluate_metrics_on_dataset(  # noqa: D417
     """
 
     def evaluate_data_point(dp: tuple[jax.Array]) -> dict:
-        pred = {**pred_fn(dp[0]), "target": dp[1]}
-        return {metric.__name__: metric(**pred) for metric in _aslist(metrics)}
+        pred = {**pred_fn(dp["input"]), "target": dp["target"]}
+        return finalize_functions(functions=metrics, results={}, **pred)
 
-    # evaluated_metrics = jax.vmap(evaluate_data_point)(data)
     evaluated_metrics = lmap(evaluate_data_point, data)
     return {metric: apply(evaluated_metrics[metric]) for metric in evaluated_metrics}

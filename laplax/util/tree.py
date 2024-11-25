@@ -101,8 +101,17 @@ def eye_like(tree):
     return unravel_array_into_pytree(tree, 1, jnp.eye(get_size(tree)))
 
 
-def slice(tree, a, b):
+def tree_slice(tree, a, b):
     return jax.tree.map(operator.itemgetter(slice(a, b)), tree)
+
+
+def tree_vec_get(tree, idx):
+    if isinstance(tree, jnp.ndarray):
+        return tree[idx]  # Also works with arrays.
+    # Column flat and get index
+    flat, _ = jax.tree_util.tree_flatten(tree)
+    flat = jnp.concatenate([f.reshape(-1) for f in flat])
+    return flat[idx]
 
 
 # ---------------------------------------------------------------
@@ -120,6 +129,10 @@ def neg(tree):
 
 def sub(tree1, tree2):
     return add(tree1, neg(tree2))
+
+
+def sqrt(tree):
+    return jax.tree.map(jnp.sqrt, tree)
 
 
 def invert(tree):

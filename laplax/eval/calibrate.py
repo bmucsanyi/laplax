@@ -24,11 +24,10 @@ def evaluate_for_given_prior_prec(
 ):
     prob_predictive = set_prob_predictive(**kwargs)
 
-    def evaluate_data(dp):
-        input, target = dp
-        return {**prob_predictive(input), "target": target}
+    def evaluate_data(dp: tuple[jax.Array]) -> dict:
+        return {**prob_predictive(dp["input"]), "target": dp["target"]}
 
-    res = metric(**lmap(evaluate_data, (data[0], data[1])))
+    res = metric(**lmap(evaluate_data, data))
     return res
 
 
@@ -102,6 +101,10 @@ def optimize_prior_prec(
         num=grid_size,
         dtype=laplax_dtype(),
     )
-    prior_prec = grid_search(prior_prec_interval, objective, data)
+    prior_prec = grid_search(
+        prior_prec_interval,
+        objective,
+        data,
+    )
 
     return prior_prec

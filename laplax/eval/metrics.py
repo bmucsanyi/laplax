@@ -1,5 +1,6 @@
 # noqa: D100
 import math
+from collections import OrderedDict
 
 import jax
 import jax.numpy as jnp
@@ -113,20 +114,21 @@ def calculate_bin_metrics(
 # Regression metrics
 # --------------------------------------------------------------------------------
 
-# REGRESSION METRICS
-
 
 def estimate_q(
     pred_mean: jnp.ndarray,
     pred_std: jnp.ndarray,
     target: jnp.ndarray,
+    **kwargs,
 ) -> float:
     """Estimate the q value."""
+    del kwargs
     return jnp.mean(jnp.power(pred_mean - target, 2) / jnp.power(pred_std, 2))
 
 
-def estimate_rmse(pred_mean: jax.Array, target: jax.Array) -> float:
+def estimate_rmse(pred_mean: jax.Array, target: jax.Array, **kwargs) -> float:
     """Estimate the RMSE."""
+    del kwargs
     return jnp.sqrt(jnp.mean(jnp.power(pred_mean - target, 2)))
 
 
@@ -155,6 +157,8 @@ def nll_gaussian(  # noqa: D417
 
     This code follows: https://github.com/uncertainty-toolbox/uncertainty-toolbox/blob/main/uncertainty_toolbox/metrics_scoring_rule.py
     """
+    del kwargs
+
     # Ensure input arrays are 1D and of the same shape
     assert (  # noqa: S101
         pred.shape == pred_std.shape == target.shape
@@ -172,3 +176,10 @@ def nll_gaussian(  # noqa: D417
         nll /= math.prod(pred.shape)
 
     return nll
+
+
+DEFAULT_REGRESSION_METRICS = OrderedDict([
+    ("rmse", estimate_rmse),
+    ("q", estimate_q),
+    ("nll", nll_gaussian),
+])

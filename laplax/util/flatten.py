@@ -7,7 +7,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from laplax.types import Callable, PyTree, PyTreeDef
+from laplax.types import Any, Callable, PyTree, PyTreeDef
 
 # ---------------------------------------------------------------
 # Flattening utilities
@@ -38,8 +38,8 @@ def create_pytree_flattener(tree: PyTree):
         return jax.tree.unflatten(
             tree_def,
             [
-                arr.reshape(sh)
-                for arr, sh in zip(flat_vector_split, all_shapes, strict=True)
+                a.reshape(sh)
+                for a, sh in zip(flat_vector_split, all_shapes, strict=True)
             ],
         )
 
@@ -152,6 +152,35 @@ def flatten_hessian(hessian_pytree: PyTree, params_pytree: PyTree) -> jax.Array:
     )
 
     return full_hessian
+
+
+def identity(x: Any) -> Any:
+    return x
+
+
+def wrap_function(
+    fn: Callable,
+    input_fn: Callable | None = None,
+    output_fn: Callable | None = None,
+    argnums: int = 0,
+) -> Callable:
+    def wrapper(*args, **kwargs):
+        # Use the identity function if input_fn or output_fn is None
+        effective_input_fn = input_fn or identity
+        effective_output_fn = output_fn or identity
+
+        # Call the original function on transformed input
+        transformed_args = (
+            *args[:argnums],
+            effective_input_fn(args[argnums]),
+            *args[argnums + 1 :],
+        )
+        result = fn(*transformed_args, **kwargs)
+
+        # Apply the output transformation function
+        return effective_output_fn(result)
+
+    return wrapper
 
 
 def inflate_and_flatten(flatten_fn: callable, inflate_fn: callable, argnums: int = 0):

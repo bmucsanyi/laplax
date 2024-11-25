@@ -6,18 +6,22 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
+from laplax import util
 from laplax.types import PyTree
 from laplax.util.flatten import unravel_array_into_pytree
 from laplax.util.ops import lmap
 from laplax.util.tree import (
     basis_vector_from_index,
     eye_like,
+    get_size,
     tree_matvec,
     tree_partialmatvec,
 )
 
 
-def diagonal(mv: Callable, size: int, tree: dict | None = None) -> jax.Array:
+def diagonal(
+    mv: Callable | jax.Array, size: int | None = None, tree: dict | None = None
+) -> jax.Array:
     """Return the diagonal of a PyTree-based matrix-vector-product.
 
     Args:
@@ -28,11 +32,19 @@ def diagonal(mv: Callable, size: int, tree: dict | None = None) -> jax.Array:
     Return:
         jax.Array: Diagonal of the matrix-free matrix.
     """
-    if tree:
+    if size is None and tree is None:
+        msg = "Either size or tree needs to be present."
+        raise ValueError(msg)
+
+    if isinstance(mv, jnp.ndarray):  # Q: Allow arr as diagonal
+        return jnp.diag(mv)
+
+    if tree is not None:
+        size = get_size(tree)
 
         @jax.jit
         def get_basis_vec(idx: int):
-            return basis_vector_from_index(tree, idx)
+            return basis_vector_from_index(idx, tree)
 
     else:
 
@@ -41,13 +53,17 @@ def diagonal(mv: Callable, size: int, tree: dict | None = None) -> jax.Array:
             zero_vec = jnp.zeros(size)
             return zero_vec.at[idx].set(1.0)
 
-    return jnp.stack([mv(get_basis_vec(i))[i] for i in range(size)])
+    return jnp.stack([
+        util.tree.tree_vec_get(mv(get_basis_vec(i)), i) for i in range(size)
+    ])
 
 
 def todense(mv: Callable, like: dict | int | None = None) -> jax.Array:
     """Return dense matrix for mv-product."""
     identity = jnp.eye(like) if isinstance(like, int) else eye_like(like)
-    return lmap(mv, identity)
+    return jax.tree.map(
+        jnp.transpose, lmap(mv, identity)
+    )  # Lmap shares along the first axis (rows instead of columns).
 
 
 def todensetree(mv: Callable, tree: PyTree) -> PyTree:

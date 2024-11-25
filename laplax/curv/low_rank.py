@@ -4,7 +4,6 @@ import jax
 import jax.numpy as jnp
 from jax.experimental.sparse.linalg import lobpcg_standard
 
-from laplax.curv.lanczos import lanczos_isqrt_full_reortho, lanczos_random_init
 from laplax.types import DType, KeyType
 
 # ---------------------------------------------------------------
@@ -12,33 +11,11 @@ from laplax.types import DType, KeyType
 # ---------------------------------------------------------------
 
 
-def get_low_rank_small_eigenvalues(
-    mv: Callable,
-    maxiter: int,
-    size: int,
-    key: KeyType,
-    dtype: DType = jnp.float64,
-) -> dict:
-    # Initialize the Lanczos algorithm
-    b = lanczos_random_init(key, size)
-
-    # Run the Lanczos algorithm
-    D = lanczos_isqrt_full_reortho(mv, b, maxiter=maxiter)
-
-    # Calculate svd of low rank
-    svd_result = jnp.linalg.svd(D, full_matrices=False)
-
-    return {
-        "U": jnp.asarray(svd_result.U, dtype=dtype),
-        "S": jnp.asarray(svd_result.S**-2, dtype=dtype),
-    }
-
-
 def get_low_rank_large_eigenvalues(
     mv: Callable,
+    key: KeyType,
     maxiter: int,
     size: int,
-    key: KeyType,
     dtype: DType = jnp.float64,
 ) -> dict:
     # Assert
@@ -57,24 +34,18 @@ def get_low_rank_large_eigenvalues(
 
     return {
         "U": jnp.asarray(eigenvecs, dtype=dtype),
-        "S": jnp.asarray(eigenvecs, dtype=dtype),
+        "S": jnp.asarray(eigenvals, dtype=dtype),
     }
-
-
-low_rank_options = {
-    "large": get_low_rank_large_eigenvalues,
-    "small": get_low_rank_small_eigenvalues,
-}
 
 
 def get_low_rank(
     mv: Callable,
-    size: int,
     key: KeyType,
+    size: int,
     maxiter: int = 20,
     local_dtype_switch: bool = True,
-    eigval_mode: str = "small",
     dtype: DType = jnp.float64,
+    **kwargs,
 ) -> dict:
     """Handling low rank calculations."""
     # Set local dtype if necessary
@@ -85,7 +56,7 @@ def get_low_rank(
         local_dtype = dtype
 
     # Get low rank
-    low_rank_tuple = low_rank_options[eigval_mode](
+    low_rank_tuple = get_low_rank_large_eigenvalues(
         mv, maxiter=maxiter, size=size, key=key, dtype=local_dtype
     )
 
@@ -97,50 +68,3 @@ def get_low_rank(
             jax.config.update("jax_enable_x64", False)
 
     return low_rank_tuple
-
-
-# -------------------------------------------------------------
-# Low rank mv callables
-# -------------------------------------------------------------
-
-
-def low_rank_mv_factory(low_rank_terms: dict):
-    # Extract terms
-    U = low_rank_terms["U"]
-    S = low_rank_terms["S"]
-
-    # Define mv-product
-    def low_rank_mv(vec):
-        return U @ (S[:, None] * (U.T @ vec))
-
-    return low_rank_mv
-
-
-def low_rank_plus_diagonal_mv_factory(low_rank_terms: dict):
-    # Extract terms
-    U = low_rank_terms["U"]
-    S = low_rank_terms["S"]
-    scalar = low_rank_terms["scalar"]
-
-    # Define mv-product
-    def low_rank_mv(vec):
-        return scalar * vec + U @ (S[:, None] * (U.T @ vec))
-
-    return low_rank_mv
-
-
-def invert_low_rank_plus_diagonal(low_rank_terms: dict):
-    # Extract terms
-    U = low_rank_terms["U"]
-    S = low_rank_terms["S"]
-    scalar = low_rank_terms["scalar"]
-
-    return {"U": U, "S": -S / (scalar * (S + scalar)), "scalar": scalar}
-
-
-def inv_low_rank_plus_diagonal_mv_factory(low_rank_terms: dict):
-    # inverse low rank terms
-    low_rank_terms_inv = invert_low_rank_plus_diagonal(low_rank_terms)
-
-    # create mv product
-    return low_rank_mv_factory(low_rank_terms_inv)

@@ -2,7 +2,7 @@
 # import jax
 # from typing import Callable, Tuple
 
-# def get_laplace(
+# def laplace(
 #         model_fn: Callable,
 #         params: jax.PyTreeLike,
 #         data: Tuple[jax.Array, jax.Array],
@@ -17,6 +17,3 @@
 #     Returns:
 #         The Laplace approximation.
 #     """
-
-
-#     return get_cov_scale
