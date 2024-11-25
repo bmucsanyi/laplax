@@ -15,9 +15,9 @@ from flax import linen as nn
 import equinox as eqx
 from pytest_cases import parametrize_with_cases
 from jax import random
+from .cases.classification import case_classification
 
-#TODO: als class, klasse case function mit inchannels etc. paranmetrisieren möglich
-
+"""
 class Regression:
 # use for one of: "linen", "nnx" or "equinox
     def case_linen(self):
@@ -247,7 +247,23 @@ class Classification:
 
         params = eqx.filter(model, eqx.is_inexact_array)
         return model_fn, data, params
+"""
 
+import jax
+import jax.numpy as jnp
+import pytest_cases
+
+from laplax.curv.cov import create_posterior_function
+from laplax.curv.ggn import create_ggn_mv
+from laplax.eval.push_forward import set_lin_pushforward, set_mc_pushforward
+
+from .cases.regression import case_regression
+
+
+@pytest_cases.parametrize(
+    "curv_op",
+    ["full", "diagonal", "low_rank"],
+)
 @parametrize_with_cases("model_fn, data, params", cases=[Classification])
 def test_push_forward(model_fn, data, params):
     # Calculate ggn
