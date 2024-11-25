@@ -201,31 +201,53 @@ class Classification:
 
         _, params, rest = nnx.split(model, nnx.Param, ...)
         return model_fn, data, params
-"""
-    def case_equinox(self):
-        class MLP(eqx.Module):
-            layers: list
 
-            def __init__(self, rngs, in_channels=1, hidden_channels=20, out_channels=1):
-                self.layers = [eqx.nn.Linear(in_channels, hidden_channels, rngs),
-                               eqx.nn.Linear(hidden_channels, out_channels, rngs)]
+    def case_equinox(self):
+
+        class CNN(eqx.Module):
+            layers: list
+            activation: Callable = eqx.static_field()
+            final_activation: Callable = eqx.static_field()
+
+            def __init__(self, key):
+                key1, key2 = jax.random.split(key, 2)
+                # Standard CNN setup: convolutional layer, followed by flattening,
+                # with a small MLP on top.
+                self.layers = [
+                    eqx.nn.Conv2d(1, 2, kernel_size=3, key=key1),
+                    eqx.nn.AvgPool2d(kernel_size=2, stride=2),
+                    eqx.nn.Linear(32, 10, key=key2),
+                ]
+                self.activation = nn.relu
+                self.final_activation = nn.relu
 
             def __call__(self, x):
-                for layer in self.layers[:-1]:
-                    x = jax.nn.tanh(layer(x))
-                return self.layers[-1](x)
+                for layer in self.layers:
+                    x = layer(x)
+                return self.final_activation(x)
 
         key = jax.random.key(0)
         rngs = nnx.Rngs(0)
         data = {
-            "input": jax.random.normal(key, (1, 10)),
-            "target": jax.random.normal(key, (1, 1)),
+            # Single grayscale image with shape (1, 8, 8, 1) for batch size 1
+            "input": jax.random.normal(key, (1, 1, 1, 8, 8)),
+
+            # Random one-hot target with 10 classes
+            "target": jax.nn.one_hot(jax.random.randint(key, (1,), 0, 10), num_classes=10),
         }
 
-        model = MLP(in_channels=10, hidden_channels=20, out_channels=1, rngs=rngs)
-        return model, data
-        
-"""
+        model = CNN(key=key)
+
+        def model_fn(params, input):
+            if input.ndim == 1:
+                input = jnp.expand_dims(input, axis=0)
+                # Enforce batch size and input dimensions
+            new_model = eqx.tree_at(lambda m: m, model, params)
+            return jax.vmap(new_model)(input)
+
+        params = eqx.filter(model, eqx.is_inexact_array)
+        return model_fn, data, params
+
 @parametrize_with_cases("model_fn, data, params", cases=[Classification])
 def test_push_forward(model_fn, data, params):
     # Calculate ggn
