@@ -7,25 +7,26 @@ from flax import linen as nn
 from flax import nnx
 from jax import numpy as jnp
 
+
 def generate_data(key, input_shape, target_shape):
     return {
         "input": jax.random.normal(key, input_shape),
-        "target": jax.random.normal(key, target_shape),
+        "target": jax.nn.one_hot(jax.random.randint(key, (target_shape[0],), 0, maxval=target_shape[1]), num_classes=target_shape[1]),
     }
 
 
 class BaseClassificationTask:
     def __init__(
-        self,
-        in_channels: int,
-        conv_features: int,
-        conv_kernel_size: int,
-        avg_pool_shape: int,
-        avg_pool_strides: int,
-        linear_in: int,
-        out_channels: int,
-        seed: int,
-        framework: str,
+            self,
+            in_channels: tuple,
+            conv_features: int,
+            conv_kernel_size: int,
+            avg_pool_shape: int,
+            avg_pool_strides: int,
+            linear_in: int,
+            out_channels: int,
+            seed: int,
+            framework: str,
     ):
         self.in_channels = in_channels
         self.conv_features = conv_features
@@ -53,7 +54,7 @@ class BaseClassificationTask:
     def get_data_batch(self, batch_size: int) -> dict:
         key = jax.random.key(self.seed)
         return generate_data(
-            key, (batch_size, self.in_channels), (batch_size, self.out_channels)
+            key, (batch_size,) + self.in_channels, (batch_size, self.out_channels)
         )
 
 
@@ -63,7 +64,7 @@ class LinenClassificationTask(BaseClassificationTask):
 
     def _initialize(self):
         class CNN(nn.Module):
-            in_channels: int
+            in_channels: tuple
             conv_features: int
             conv_kernel_size: int
             avg_pool_shape: int
@@ -71,25 +72,31 @@ class LinenClassificationTask(BaseClassificationTask):
             out_channels: int
 
             def setup(self):
-                self.conv1 = nn.Conv(features=self.conv_features, kernel_size=(self.conv_kernel_size, self.conv_kernel_size))
+                self.conv1 = nn.Conv(features=self.conv_features,
+                                     kernel_size=(self.conv_kernel_size, self.conv_kernel_size))
                 self.linear1 = nn.Dense(features=self.out_channels)
 
             def __call__(self, x):
                 # Ensure x has 4 dimensions (batch_size, height, width, channels)
+                batch_dim = True
                 if x.ndim == 3:
                     x = jnp.expand_dims(x, axis=0)
+                    batch_dim = False
 
                 x = nn.relu(self.conv1(x))
-                x = nn.avg_pool(x, window_shape=self.avg_pool_shape, strides=self.avg_pool_strides)
+                x = nn.avg_pool(x, window_shape=(self.avg_pool_shape,self.avg_pool_shape), strides=(self.avg_pool_strides,self.avg_pool_strides))
 
                 x = x.reshape((x.shape[0], -1))  # Shape: (batch_size, flattened_features)
 
                 x = nn.relu(self.linear1(x))
 
-                return x
+                if not batch_dim:
+                    return jnp.squeeze(x)
+                else:
+                    return x
 
         rng_key = jax.random.PRNGKey(self.seed)
-        data = generate_data(rng_key, (1, self.in_channels), (1, self.out_channels))
+        data = generate_data(rng_key, (1,) + self.in_channels, (1, self.out_channels))
         self.model = CNN(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
@@ -105,3 +112,55 @@ class LinenClassificationTask(BaseClassificationTask):
             return self.model.apply(params, input)
 
         return model_fn
+
+
+def create_task(
+        task_class,
+        in_channels,
+        conv_features,
+        conv_kernel_size,
+        avg_pool_shape,
+        avg_pool_strides,
+        out_channels,
+        linear_in,
+        seed
+):
+    """Factory function to create regression tasks."""
+    return task_class(
+        in_channels=in_channels,
+        conv_features=conv_features,
+        conv_kernel_size=conv_kernel_size,
+        avg_pool_shape=avg_pool_shape,
+        avg_pool_strides=avg_pool_strides,
+        linear_in=linear_in,
+        out_channels=out_channels,
+        seed=seed,
+    )
+
+
+@pytest_cases.parametrize(
+    "task_class", [LinenClassificationTask]
+)
+@pytest_cases.parametrize("in_channels", [(8 ,8 ,1)])
+@pytest_cases.parametrize("conv_features", [2])
+@pytest_cases.parametrize("conv_kernel_size", [3])
+@pytest_cases.parametrize("avg_pool_shape", [2])
+@pytest_cases.parametrize("avg_pool_strides", [2])
+@pytest_cases.parametrize("linear_in", [32])
+@pytest_cases.parametrize("out_channels", [10])
+def case_classification(
+        task_class,
+        in_channels: tuple,
+        conv_features: int,
+        conv_kernel_size: int,
+        avg_pool_shape: int,
+        avg_pool_strides: int,
+        linear_in: int,
+        out_channels: int
+):
+    """Test regression tasks with multiple frameworks and parameter combinations."""
+    seed = 42
+    return task_class(in_channels, conv_features, conv_kernel_size, avg_pool_shape, avg_pool_strides, linear_in, out_channels,
+                      seed)
+
+
