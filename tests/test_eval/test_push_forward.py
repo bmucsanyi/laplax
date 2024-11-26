@@ -1,19 +1,3 @@
-import jax
-import jax.numpy as jnp
-from flax import nnx
-
-from typing import List, Callable, Any
-from laplax.curv.ggn import create_ggn_mv
-from laplax.eval.push_forward import set_mc_pushforward
-from laplax.util.flatten import create_partial_pytree_flattener
-from laplax.util.mv import todense
-from laplax.util.tree import allclose, get_size, ones_like
-from functools import partial
-
-from flax import linen as nn
-import equinox as eqx
-from pytest_cases import parametrize_with_cases
-from jax import random
 from .cases.classification import case_classification
 
 """
@@ -247,18 +231,6 @@ class Classification:
         params = eqx.filter(model, eqx.is_inexact_array)
         return model_fn, data, params
 """
-
-import jax
-import jax.numpy as jnp
-import pytest_cases
-
-from laplax.curv.cov import create_posterior_function
-from laplax.curv.ggn import create_ggn_mv
-from laplax.eval.push_forward import set_lin_pushforward, set_mc_pushforward
-
-from .cases.regression import case_regression
-
-
 import jax
 import jax.numpy as jnp
 import pytest_cases
@@ -307,7 +279,7 @@ def test_mc_push_forward(curv_op, task):
     # # Check results
     pred = jax.vmap(lambda x: model_fn(params, x))(data["input"])
     assert (5, task.out_channels) == results["samples"].shape[1:]  # Check shape
-    assert jnp.all(results["pred_std"] > 0) #TODO: > or >=? (sometimes a class is always 0 for the classification)
+    assert jnp.all(results["pred_std"] >= 0)
     assert jnp.allclose(pred, results["pred"])
 
 
@@ -316,7 +288,7 @@ def test_mc_push_forward(curv_op, task):
     ["diagonal", "low_rank"],
 )
 
-@pytest_cases.parametrize_with_cases("task", cases=case_classification)
+@pytest_cases.parametrize_with_cases("task", cases=[case_classification])
 def test_lin_push_forward(curv_op, task):
     model_fn = task.get_model_fn()
     params = task.get_parameters()

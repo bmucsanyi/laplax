@@ -176,6 +176,60 @@ class NNXClassificationTask(BaseClassificationTask):
         return model_fn
 
 
+class EquinoxClassificationTask(BaseClassificationTask):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, framework="equinox")
+
+    def _initialize(self):
+        class CNN(eqx.Module):
+            conv1: eqx.nn.Conv2d
+            avg_pool: eqx.nn.AvgPool2d
+            linear1: eqx.nn.Linear
+            def __init__(
+                    self,
+                    key,
+                    in_channels: tuple,
+                    conv_features: int,
+                    conv_kernel_size: int,
+                    avg_pool_shape: int,
+                    avg_pool_strides: int,
+                    linear_in: int,
+                    out_channels: int
+            ):
+                key1, key2 = jax.random.split(key, 2)
+                self.conv1 = eqx.nn.Conv2d(in_channels[2], conv_features, kernel_size=conv_kernel_size, padding=((1, 1),(1, 1)), key=key1)
+                self.avg_pool = eqx.nn.AvgPool2d(kernel_size=avg_pool_shape, stride=avg_pool_strides)
+                self.linear1 = eqx.nn.Linear(linear_in, out_channels, key=key2)
+
+            def __call__(self, x):
+                x = nn.relu(self.conv1(x))
+                x = self.avg_pool(x)
+                x = x.reshape(x.shape[0], -1)
+                x = nn.relu(self.linear1(x))
+                return x
+
+        key = jax.random.key(self.seed)
+
+        self.model = CNN(
+            key=key,
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            conv_features=self.conv_features,
+            conv_kernel_size=self.conv_kernel_size,
+            avg_pool_shape=self.avg_pool_shape,
+            avg_pool_strides=self.avg_pool_strides,
+            linear_in=self.linear_in,
+        )
+        self.params = eqx.filter(self.model, eqx.is_inexact_array)
+
+    def get_model_fn(self):
+        def model_fn(params, input):
+            new_model = eqx.tree_at(lambda m: m, self.model, params)
+            input = jnp.transpose(input, (2, 0, 1))
+            return new_model(input)
+
+        return model_fn
+
 def create_task(
         task_class,
         in_channels,
@@ -201,7 +255,7 @@ def create_task(
 
 
 @pytest_cases.parametrize(
-    "task_class", [NNXClassificationTask]
+    "task_class", [EquinoxClassificationTask]
 )
 @pytest_cases.parametrize("in_channels", [(8, 8, 1)])
 @pytest_cases.parametrize("conv_features", [2])
