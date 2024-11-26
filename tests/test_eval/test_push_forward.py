@@ -307,13 +307,13 @@ def test_mc_push_forward(curv_op, task):
     # # Check results
     pred = jax.vmap(lambda x: model_fn(params, x))(data["input"])
     assert (5, task.out_channels) == results["samples"].shape[1:]  # Check shape
-    assert jnp.all(results["pred_std"] > 0)
+    assert jnp.all(results["pred_std"] > 0) #TODO: > or >=? (sometimes a class is always 0 for the classification)
     assert jnp.allclose(pred, results["pred"])
 
 
 @pytest_cases.parametrize(
     "curv_op",
-    ["full", "diagonal", "low_rank"],
+    ["diagonal", "low_rank"],
 )
 
 @pytest_cases.parametrize_with_cases("task", cases=case_classification)

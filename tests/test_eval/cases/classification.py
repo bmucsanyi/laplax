@@ -6,12 +6,14 @@ import pytest_cases
 from flax import linen as nn
 from flax import nnx
 from jax import numpy as jnp
+from functools import partial
 
 
 def generate_data(key, input_shape, target_shape):
     return {
         "input": jax.random.normal(key, input_shape),
-        "target": jax.nn.one_hot(jax.random.randint(key, (target_shape[0],), 0, maxval=target_shape[1]), num_classes=target_shape[1]),
+        "target": jax.nn.one_hot(jax.random.randint(key, (target_shape[0],), 0, maxval=target_shape[1]),
+                                 num_classes=target_shape[1]),
     }
 
 
@@ -114,6 +116,66 @@ class LinenClassificationTask(BaseClassificationTask):
         return model_fn
 
 
+class NNXClassificationTask(BaseClassificationTask):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, framework="nnx")
+
+    def _initialize(self):
+        class CNN(nnx.Module):
+
+            def __init__(
+                    self,
+                    rngs:nnx.Rngs,
+                    in_channels: tuple,
+                    conv_features: int,
+                    conv_kernel_size: int,
+                    avg_pool_shape: int,
+                    avg_pool_strides: int,
+                    linear_in: int,
+                    out_channels: int
+            ):
+                self.conv1 = nnx.Conv(in_channels[2], conv_features, kernel_size=(conv_kernel_size, conv_kernel_size), rngs=rngs)
+                self.avg_pool = partial(nnx.avg_pool, window_shape=(avg_pool_shape, avg_pool_shape), strides=(avg_pool_strides, avg_pool_strides))
+                self.linear1 = nnx.Linear(linear_in, out_channels, rngs=rngs)
+
+            def __call__(self, x):
+                batch_dim = True
+                if x.ndim == 3:
+                    x = jnp.expand_dims(x, axis=0)
+                    batch_dim = False
+
+                x = self.avg_pool(nnx.relu(self.conv1(x)))
+                x = x.reshape(x.shape[0], -1)  # flatten
+                x = nnx.relu(self.linear1(x))
+
+                if not batch_dim:
+                    return jnp.squeeze(x)
+                else:
+                    return x
+
+        rngs = nnx.Rngs(self.seed)
+
+        self.model = CNN(
+            rngs=rngs,
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            conv_features=self.conv_features,
+            conv_kernel_size=self.conv_kernel_size,
+            avg_pool_shape=self.avg_pool_shape,
+            avg_pool_strides=self.avg_pool_strides,
+            linear_in=self.linear_in,
+        )
+        _, self.params, _ = nnx.split(self.model, nnx.Param, ...)
+
+    def get_model_fn(self):
+        def model_fn(params, input):
+            _, _, rest = nnx.split(self.model, nnx.Param, ...)
+            nnx.update(self.model, nnx.GraphState.merge(params, rest))  # Load the model from parameters
+            return self.model(input)
+
+        return model_fn
+
+
 def create_task(
         task_class,
         in_channels,
@@ -139,9 +201,9 @@ def create_task(
 
 
 @pytest_cases.parametrize(
-    "task_class", [LinenClassificationTask]
+    "task_class", [NNXClassificationTask]
 )
-@pytest_cases.parametrize("in_channels", [(8 ,8 ,1)])
+@pytest_cases.parametrize("in_channels", [(8, 8, 1)])
 @pytest_cases.parametrize("conv_features", [2])
 @pytest_cases.parametrize("conv_kernel_size", [3])
 @pytest_cases.parametrize("avg_pool_shape", [2])
@@ -160,7 +222,6 @@ def case_classification(
 ):
     """Test regression tasks with multiple frameworks and parameter combinations."""
     seed = 42
-    return task_class(in_channels, conv_features, conv_kernel_size, avg_pool_shape, avg_pool_strides, linear_in, out_channels,
+    return task_class(in_channels, conv_features, conv_kernel_size, avg_pool_shape, avg_pool_strides, linear_in,
+                      out_channels,
                       seed)
-
-
