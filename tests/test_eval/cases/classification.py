@@ -71,8 +71,6 @@ class LinenClassificationTask(BaseClassificationTask):
             avg_pool_shape: int
             avg_pool_strides: int
             out_channels: int
-            conv1: nn.Conv
-            linear1: nn.Dense
 
             def setup(self):
                 self.conv1 = nn.Conv(features=self.conv_features,
@@ -262,13 +260,15 @@ def create_task(
 
 
 @pytest_cases.parametrize(
-    "task_class, in_channels, conv_features, conv_kernel_size, avg_pool_shape, avg_pool_strides, linear_in, "
-    "out_channels",
+    "task_class", [LinenClassificationTask, NNXClassificationTask, EquinoxClassificationTask]
+)
+@pytest_cases.parametrize(
+    "in_channels, conv_features, conv_kernel_size, avg_pool_shape, avg_pool_strides, linear_in, out_channels",
     [
         # Configuration 1
-        ([LinenClassificationTask, NNXClassificationTask, EquinoxClassificationTask], (8, 8, 1), 2, 3, 2, 2, 32, 10),
+        ((8, 8, 1), 2, 3, 2, 2, 32, 10),
         # Configuration 2
-        ([LinenClassificationTask, NNXClassificationTask, EquinoxClassificationTask], (11, 5, 3), 2, 3, 2, 2, 20, 2)
+        ((11, 5, 3), 2, 3, 2, 2, 20, 2)
     ]
 )
 def case_classification(

@@ -1,4 +1,5 @@
 from .cases.regression import case_regression
+from .cases.classification import case_classification
 import jax
 import jax.numpy as jnp
 import pytest_cases
@@ -12,7 +13,7 @@ from laplax.eval.push_forward import set_lin_pushforward, set_mc_pushforward
     "curv_op",
     ["full", "diagonal", "low_rank"],
 )
-@pytest_cases.parametrize_with_cases("task", cases=[case_regression,case_classification])
+@pytest_cases.parametrize_with_cases("task", cases=[case_regression, case_classification])
 def test_mc_push_forward(curv_op, task):
     model_fn = task.get_model_fn()
     params = task.get_parameters()
@@ -53,7 +54,7 @@ def test_mc_push_forward(curv_op, task):
     "curv_op",
     ["full", "diagonal", "low_rank"],
 )
-@pytest_cases.parametrize_with_cases("task", cases=[case_regression,case_classification])
+@pytest_cases.parametrize_with_cases("task", cases=[case_regression, case_classification])
 def test_lin_push_forward(curv_op, task):
     model_fn = task.get_model_fn()
     params = task.get_parameters()

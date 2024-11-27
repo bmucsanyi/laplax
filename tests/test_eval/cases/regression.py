@@ -56,8 +56,6 @@ class LinenRegressionTask(BaseRegressionTask):
         class MLP(nn.Module):
             hidden_channels: int
             out_channels: int
-            linear1: nn.Dense
-            linear2: nn.Dense
 
             def setup(self):
                 self.linear1 = nn.Dense(self.hidden_channels)
