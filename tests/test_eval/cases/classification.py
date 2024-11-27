@@ -1,10 +1,9 @@
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable
 
 import equinox as eqx
 import jax
 import pytest_cases
-from flax import linen as nn
-from flax import nnx
+from flax import nnx, linen as nn
 from jax import numpy as jnp
 from functools import partial
 
@@ -72,6 +71,8 @@ class LinenClassificationTask(BaseClassificationTask):
             avg_pool_shape: int
             avg_pool_strides: int
             out_channels: int
+            conv1: nn.Conv
+            linear1: nn.Dense
 
             def setup(self):
                 self.conv1 = nn.Conv(features=self.conv_features,
@@ -86,7 +87,8 @@ class LinenClassificationTask(BaseClassificationTask):
                     batch_dim = False
 
                 x = nn.relu(self.conv1(x))
-                x = nn.avg_pool(x, window_shape=(self.avg_pool_shape,self.avg_pool_shape), strides=(self.avg_pool_strides,self.avg_pool_strides))
+                x = nn.avg_pool(x, window_shape=(self.avg_pool_shape, self.avg_pool_shape),
+                                strides=(self.avg_pool_strides, self.avg_pool_strides))
 
                 x = x.reshape((x.shape[0], -1))  # Shape: (batch_size, flattened_features)
 
@@ -125,7 +127,7 @@ class NNXClassificationTask(BaseClassificationTask):
 
             def __init__(
                     self,
-                    rngs:nnx.Rngs,
+                    rngs: nnx.Rngs,
                     in_channels: tuple,
                     conv_features: int,
                     conv_kernel_size: int,
@@ -134,8 +136,10 @@ class NNXClassificationTask(BaseClassificationTask):
                     linear_in: int,
                     out_channels: int
             ):
-                self.conv1 = nnx.Conv(in_channels[2], conv_features, kernel_size=(conv_kernel_size, conv_kernel_size), rngs=rngs)
-                self.avg_pool = partial(nnx.avg_pool, window_shape=(avg_pool_shape, avg_pool_shape), strides=(avg_pool_strides, avg_pool_strides))
+                self.conv1 = nnx.Conv(in_channels[2], conv_features, kernel_size=(conv_kernel_size, conv_kernel_size),
+                                      rngs=rngs)
+                self.avg_pool = partial(nnx.avg_pool, window_shape=(avg_pool_shape, avg_pool_shape),
+                                        strides=(avg_pool_strides, avg_pool_strides))
                 self.linear1 = nnx.Linear(linear_in, out_channels, rngs=rngs)
 
             def __call__(self, x):
@@ -185,6 +189,7 @@ class EquinoxClassificationTask(BaseClassificationTask):
             conv1: eqx.nn.Conv2d
             avg_pool: eqx.nn.AvgPool2d
             linear1: eqx.nn.Linear
+
             def __init__(
                     self,
                     key,
@@ -197,14 +202,15 @@ class EquinoxClassificationTask(BaseClassificationTask):
                     out_channels: int
             ):
                 key1, key2 = jax.random.split(key, 2)
-                self.conv1 = eqx.nn.Conv2d(in_channels[2], conv_features, kernel_size=conv_kernel_size, padding=((1, 1),(1, 1)), key=key1)
+                self.conv1 = eqx.nn.Conv2d(in_channels[2], conv_features, kernel_size=conv_kernel_size,
+                                           padding=((1, 1), (1, 1)), key=key1)
                 self.avg_pool = eqx.nn.AvgPool2d(kernel_size=avg_pool_shape, stride=avg_pool_strides)
                 self.linear1 = eqx.nn.Linear(linear_in, out_channels, key=key2)
 
             def __call__(self, x):
                 x = nn.relu(self.conv1(x))
                 x = self.avg_pool(x)
-                x = x.reshape(x.shape[0], -1)
+                x = jnp.ravel(x)
                 x = nn.relu(self.linear1(x))
                 return x
 
@@ -220,15 +226,16 @@ class EquinoxClassificationTask(BaseClassificationTask):
             avg_pool_strides=self.avg_pool_strides,
             linear_in=self.linear_in,
         )
-        self.params = eqx.filter(self.model, eqx.is_inexact_array)
+        self.params, self.static = eqx.partition(self.model, eqx.is_array)
 
     def get_model_fn(self):
         def model_fn(params, input):
-            new_model = eqx.tree_at(lambda m: m, self.model, params)
+            new_model = eqx.combine(params, self.static)
             input = jnp.transpose(input, (2, 0, 1))
             return new_model(input)
 
         return model_fn
+
 
 def create_task(
         task_class,
@@ -255,15 +262,15 @@ def create_task(
 
 
 @pytest_cases.parametrize(
-    "task_class", [EquinoxClassificationTask]
+    "task_class, in_channels, conv_features, conv_kernel_size, avg_pool_shape, avg_pool_strides, linear_in, "
+    "out_channels",
+    [
+        # Configuration 1
+        ([LinenClassificationTask, NNXClassificationTask, EquinoxClassificationTask], (8, 8, 1), 2, 3, 2, 2, 32, 10),
+        # Configuration 2
+        ([LinenClassificationTask, NNXClassificationTask, EquinoxClassificationTask], (11, 5, 3), 2, 3, 2, 2, 20, 2)
+    ]
 )
-@pytest_cases.parametrize("in_channels", [(8, 8, 1)])
-@pytest_cases.parametrize("conv_features", [2])
-@pytest_cases.parametrize("conv_kernel_size", [3])
-@pytest_cases.parametrize("avg_pool_shape", [2])
-@pytest_cases.parametrize("avg_pool_strides", [2])
-@pytest_cases.parametrize("linear_in", [32])
-@pytest_cases.parametrize("out_channels", [10])
 def case_classification(
         task_class,
         in_channels: tuple,
