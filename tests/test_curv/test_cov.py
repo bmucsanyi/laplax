@@ -6,10 +6,11 @@ import pytest_cases
 
 from laplax import util
 from laplax.curv.cov import (
-    CURVATURE_COV_METHODS,
-    CURVATURE_INVERSE_METHODS,
     CURVATURE_METHODS,
     CURVATURE_PRIOR_METHODS,
+    CURVATURE_STATE_TO_COV,
+    CURVATURE_STATE_TO_SCALE,
+    CURVATURE_TO_POSTERIOR_STATE,
     prec_to_scale,
 )
 
@@ -38,8 +39,6 @@ def invalid_prec():
 # --------------------------------------------------------------------------------------
 # Test cases
 # --------------------------------------------------------------------------------------
-
-# prec_to_scale()
 
 
 def test_prec_to_scale(prior_prec):
@@ -85,8 +84,11 @@ def test_posterior_covariance_est(task):
         prec_dense, task.true_curv + jnp.eye(task.size), atol=1e-6, rtol=1e-6
     )
 
+    # Create posterior state
+    state = CURVATURE_TO_POSTERIOR_STATE[task.method](prec)
+
     # Get and test scale matrix
-    scale_mv, state = CURVATURE_INVERSE_METHODS[task.method](prec)
+    scale_mv = CURVATURE_STATE_TO_SCALE[task.method](state)
     scale_dense = util.mv.todense(scale_mv, like=task.tree_like)
     assert jnp.allclose(
         scale_dense @ scale_dense.T @ prec_dense,
@@ -96,7 +98,7 @@ def test_posterior_covariance_est(task):
     )
 
     # Get and test covariance matrix
-    cov_mv = CURVATURE_COV_METHODS[task.method](state)
+    cov_mv = CURVATURE_STATE_TO_COV[task.method](state)
     cov_dense = util.mv.todense(cov_mv, like=task.tree_like)
     assert jnp.allclose(
         cov_dense @ prec_dense, jnp.eye(task.size), atol=1e-6, rtol=1e-6

@@ -6,6 +6,7 @@ from typing import Any
 import jax
 
 from laplax.util.ops import lmap
+from laplax.util.util import identity
 
 
 def finalize_functions(functions: OrderedDict, results: dict, **kwargs):
@@ -19,17 +20,13 @@ def finalize_functions(functions: OrderedDict, results: dict, **kwargs):
     return results
 
 
-def get_predictions_for_data_point_fn():
-    def get_predictions_for_data_point(
-        x: jax.Array,  # noqa: ARG001
-    ) -> tuple[jax.Array, jax.Array]:
-        return
+# def get_predictions_for_data_point_fn():
+#     def get_predictions_for_data_point(
+#         x: jax.Array,  # noqa: ARG001
+#     ) -> tuple[jax.Array, jax.Array]:
+#         return
 
-    return get_predictions_for_data_point
-
-
-def identity(x: Any) -> Any:
-    return x
+#     return get_predictions_for_data_point
 
 
 def evaluate_metrics_on_dataset(  # noqa: D417

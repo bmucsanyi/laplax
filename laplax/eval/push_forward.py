@@ -108,7 +108,7 @@ def set_mc_pushforward(  # noqa: PLR0913, PLR0917
     posterior: Callable,
     prior_prec: float,
     n_weight_samples: int,
-    mc_pushforward_functions: dict = DEFAULT_MC_FUNCTIONS,
+    pushforward_functions: dict = DEFAULT_MC_FUNCTIONS,
 ) -> Callable:
     # Create weight sample function
     scale_mv = posterior(prior_prec=prior_prec, return_scale=True)["scale_mv"]
@@ -129,7 +129,7 @@ def set_mc_pushforward(  # noqa: PLR0913, PLR0917
         pred_ensemble = lmap(compute_pred_ptw, jnp.arange(n_weight_samples))
 
         return finalize_functions(
-            functions=mc_pushforward_functions,
+            functions=pushforward_functions,
             results={"pred": pred},
             pred_ensemble=pred_ensemble,
         )
@@ -204,13 +204,13 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
     mean: PyTree,
     posterior: Callable,
     prior_prec: float,
-    linearized_pushforward_functions: OrderedDict = DEFAULT_LIN_FINALIZE,
+    pushforward_functions: OrderedDict = DEFAULT_LIN_FINALIZE,
     **kwargs,
 ) -> Callable:
     # Create mv function
     mv = posterior(
         prior_prec=prior_prec,
-        return_scale=("samples" in linearized_pushforward_functions),
+        return_scale=("samples" in pushforward_functions),
     )
 
     # Create push-forward functions
@@ -226,7 +226,7 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
         return vjp_fun(vector.reshape(out.shape))
 
     # Create scale mv
-    if "samples" in linearized_pushforward_functions:
+    if "samples" in pushforward_functions:
         n_samples = kwargs.get("n_samples")
         get_weight_samples = set_get_weight_sample(
             key, mean, mv.get("scale_mv"), n_samples
@@ -241,7 +241,7 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
 
         # Compute prediction
         return finalize_functions(
-            functions=linearized_pushforward_functions,
+            functions=pushforward_functions,
             results={"pred": pred},
             **set_output_cov_mv(mv, input=input, jvp=pf_jvp, vjp=pf_vjp),
             input=input,

@@ -183,7 +183,19 @@ def wrap_function(
     return wrapper
 
 
-def inflate_and_flatten(flatten_fn: callable, inflate_fn: callable, argnums: int = 0):
+def wrap_factory(
+    factory: Callable,
+    input_fn: Callable | None = None,
+    output_fn: Callable | None = None,
+) -> any:
+    def wrapped_factory(*args, **kwargs) -> Callable:  # noqa: ANN002
+        fn = factory(*args, **kwargs)
+        return wrap_function(fn, input_fn, output_fn)
+
+    return wrapped_factory
+
+
+def inflate_and_flatten(flatten_fn: Callable, inflate_fn: Callable, argnums: int = 0):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):  # noqa: ANN002

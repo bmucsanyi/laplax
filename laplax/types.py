@@ -1,7 +1,6 @@
 """Often used types defined in one place."""
 
 import collections.abc as cabc
-import typing
 from typing import Any
 
 import jax
