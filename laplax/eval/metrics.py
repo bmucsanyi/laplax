@@ -127,9 +127,15 @@ def estimate_q(
 
 
 def estimate_rmse(pred_mean: jax.Array, target: jax.Array, **kwargs) -> float:
-    """Estimate the RMSE."""
+    """Estimate the 'ensemble' RMSE with pred_mean and target."""
     del kwargs
     return jnp.sqrt(jnp.mean(jnp.power(pred_mean - target, 2)))
+
+
+def estimate_true_rmse(pred: jax.Array, target: jax.Array, **kwargs) -> float:
+    """Estimate the 'true' RMSE with pred and target."""
+    del kwargs
+    return jnp.sqrt(jnp.mean(jnp.power(pred - target, 2)))
 
 
 def nll_gaussian(  # noqa: D417
