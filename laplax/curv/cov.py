@@ -9,6 +9,7 @@ from laplax.types import Callable, PyTree
 from laplax.util.flatten import (
     create_partial_pytree_flattener,
     create_pytree_flattener,
+    wrap_factory,
     wrap_function,
 )
 from laplax.util.mv import diagonal, todense
@@ -16,6 +17,18 @@ from laplax.util.mv import diagonal, todense
 # -----------------------------------------------------------------------
 # FULL
 # -----------------------------------------------------------------------
+
+
+def create_full_curvature(mv: Callable, layout: PyTree, **kwargs):
+    """Generate a full curvature approximation."""
+    del kwargs
+    curv_est = todense(mv, layout=layout)
+    flatten_partial_tree, _ = create_partial_pytree_flattener(curv_est)
+    return flatten_partial_tree(curv_est)
+
+
+def full_with_prior(curv_est: jax.Array, **kwargs):
+    return curv_est + kwargs.get("prior_prec") * jnp.eye(curv_est.shape[-1])
 
 
 def prec_to_scale(prec: jax.Array) -> jax.Array:
@@ -35,34 +48,26 @@ def prec_to_scale(prec: jax.Array) -> jax.Array:
     return L
 
 
-def full_to_scale(prec: jax.Array) -> jax.Array:
+def full_prec_to_state(prec: jax.Array) -> jax.Array:
     scale = prec_to_scale(prec)
 
-    def scale_mv(vec):
-        return scale @ vec
-
-    return scale_mv, scale
+    return {"scale": scale}
 
 
-def full_scale_to_cov(scale: jax.Array) -> jax.Array:
-    full = scale @ scale.T
+def full_state_to_scale(state: dict) -> jax.Array:
+    def scale_mv(vec: jax.Array) -> jax.Array:
+        return state["scale"] @ vec
 
-    def cov_mv(vec: jax.Array):
-        return full @ vec
+    return scale_mv
+
+
+def full_state_to_cov(state: dict) -> jax.Array:
+    cov = state["scale"] @ state["scale"].T
+
+    def cov_mv(vec: jax.Array) -> jax.Array:
+        return cov @ vec
 
     return cov_mv
-
-
-def full_with_prior(curv_est: jax.Array, **kwargs):
-    return curv_est + kwargs.get("prior_prec") * jnp.eye(curv_est.shape[-1])
-
-
-def create_full_curvature(mv: Callable, tree: PyTree, **kwargs):
-    """Generate a full curvature approximation."""
-    del kwargs
-    curv_est = todense(mv, like=tree)
-    flatten_partial_tree, _ = create_partial_pytree_flattener(curv_est)
-    return flatten_partial_tree(curv_est)
 
 
 # ---------------------------------------------------------------------------------
@@ -70,37 +75,54 @@ def create_full_curvature(mv: Callable, tree: PyTree, **kwargs):
 # ---------------------------------------------------------------------------------
 
 
+def create_diagonal_curvature(mv: Callable, **kwargs):
+    """Generate a diagonal curvature."""
+    curv_diagonal = diagonal(mv, layout=kwargs.get("layout"))
+    return curv_diagonal
+
+
 def diag_with_prior(curv_est: jax.Array, **kwargs):
     return curv_est + kwargs.get("prior_prec") * jnp.ones_like(curv_est.shape[-1])
 
 
-def diag_to_scale(arr: jax.Array):
-    diag_sqrt_inv = jnp.sqrt(jnp.reciprocal(arr))
+def diag_prec_to_state(prec: jax.Array) -> dict:
+    return {"scale": jnp.sqrt(jnp.reciprocal(prec))}
 
+
+def diag_state_to_scale(state: dict) -> Callable:
     def diag_mv(vec):
-        return diag_sqrt_inv * vec
-
-    return diag_mv, diag_sqrt_inv
-
-
-def diag_scale_to_cov(arr: jax.Array):
-    arr_sq = arr**2
-
-    def diag_mv(vec):
-        return arr_sq * vec
+        return state["scale"] * vec
 
     return diag_mv
 
 
-def create_diagonal_curvature(mv: Callable, **kwargs):
-    """Generate a diagonal curvature."""
-    curv_diagonal = diagonal(mv, tree=kwargs.get("tree"))
-    return curv_diagonal
+def diag_state_to_cov(state: dict) -> Callable:
+    arr = state["scale"] ** 2
+
+    def diag_mv(vec):
+        return arr * vec
+
+    return diag_mv
 
 
 # ---------------------------------------------------------------------------------
 # Low-rank
 # ---------------------------------------------------------------------------------
+
+
+def create_low_rank_curvature(mv: Callable, **kwargs):
+    """Generate a lcreate_pytree_flattener, ow-rank curvature approximations."""
+    layout = kwargs.get("layout")
+    flatten, unflatten = create_pytree_flattener(layout)
+    nparams = util.tree.get_size(layout)
+    mv = jax.vmap(
+        wrap_function(fn=mv, input_fn=unflatten, output_fn=flatten),
+        in_axes=-1,
+        out_axes=-1,
+    )  # Needs matmul structure.
+    low_rank_terms = get_low_rank(mv, size=nparams, **kwargs)
+
+    return low_rank_terms
 
 
 def create_low_rank_mv(low_rank_terms: dict) -> Callable:
@@ -115,48 +137,40 @@ def create_low_rank_mv(low_rank_terms: dict) -> Callable:
     return low_rank_mv
 
 
+def low_rank_square(state: dict) -> Callable:
+    scalar, eigvals = state["scalar"], state["S"]
+    scalar_sq = scalar**2
+    return {
+        "U": state["U"],
+        "S": (eigvals + scalar) ** 2 - scalar_sq,
+        "scalar": scalar_sq,
+    }
+
+
 def low_rank_with_prior(curv_est: dict, **kwargs):
     curv_est["scalar"] = kwargs.get("prior_prec")
     return curv_est
 
 
-def low_rank_to_scale(curv_est: dict):
+def low_rank_prec_to_state(curv_est: dict):
     scalar = curv_est["scalar"]
     scalar_sqrt_inv = jnp.reciprocal(jnp.sqrt(scalar))
     eigvals = curv_est["S"]
-    new_curv_est = {
-        "U": curv_est["U"],
-        "S": jnp.reciprocal(jnp.sqrt(eigvals + scalar)) - scalar_sqrt_inv,
-        "scalar": scalar_sqrt_inv,
+    return {
+        "scale": {
+            "U": curv_est["U"],
+            "S": jnp.reciprocal(jnp.sqrt(eigvals + scalar)) - scalar_sqrt_inv,
+            "scalar": scalar_sqrt_inv,
+        }
     }
-    return create_low_rank_mv(new_curv_est), new_curv_est
 
 
-def low_rank_scale_to_cov(curv_est: dict):
-    scalar = curv_est["scalar"]
-    scalar_sq = scalar**2
-    eigvals = curv_est["S"]
-    new_curv_est = {
-        "U": curv_est["U"],
-        "S": (eigvals + scalar) ** 2 - scalar_sq,
-        "scalar": scalar_sq,
-    }
-    return create_low_rank_mv(new_curv_est)
+def low_rank_state_to_scale(state: dict) -> Callable:
+    return create_low_rank_mv(state["scale"])
 
 
-def create_low_rank_curvature(mv: Callable, **kwargs):
-    """Generate a lcreate_pytree_flattener, ow-rank curvature approximations."""
-    tree = kwargs.get("tree")
-    flatten, unflatten = create_pytree_flattener(tree)
-    nparams = util.tree.get_size(tree)
-    mv = jax.vmap(
-        wrap_function(fn=mv, input_fn=unflatten, output_fn=flatten),
-        in_axes=-1,
-        out_axes=-1,
-    )  # Needs matmul structure.
-    low_rank_terms = get_low_rank(mv, size=nparams, **kwargs)
-
-    return low_rank_terms
+def low_rank_state_to_cov(state: dict) -> Callable:
+    return create_low_rank_mv(low_rank_square(state["scale"]))
 
 
 # ---------------------------------------------------------------------------------
@@ -175,46 +189,87 @@ CURVATURE_PRIOR_METHODS = {
     "low_rank": low_rank_with_prior,
 }
 
-CURVATURE_INVERSE_METHODS = {
-    "full": full_to_scale,
-    "diagonal": diag_to_scale,
-    "low_rank": low_rank_to_scale,
+CURVATURE_TO_POSTERIOR_STATE = {
+    "full": full_prec_to_state,
+    "diagonal": diag_prec_to_state,
+    "low_rank": low_rank_prec_to_state,
 }
 
-CURVATURE_COV_METHODS = {
-    "full": full_scale_to_cov,
-    "diagonal": diag_scale_to_cov,
-    "low_rank": low_rank_scale_to_cov,
+CURVATURE_STATE_TO_SCALE = {
+    "full": full_state_to_scale,
+    "diagonal": diag_state_to_scale,
+    "low_rank": low_rank_state_to_scale,
+}
+
+CURVATURE_STATE_TO_COV = {
+    "full": full_state_to_cov,
+    "diagonal": diag_state_to_cov,
+    "low_rank": low_rank_state_to_cov,
 }
 
 
-def create_posterior_function(curvature_type: str, mv: Callable, **kwargs) -> Callable:
-    """Factory for creating posterior covariance functions based on curvature type.
+def create_posterior_function(
+    curvature_type: str, mv: Callable, layout: int | PyTree | None = None, **kwargs
+) -> Callable:
+    """Factory function to create posterior covariance functions based on curv. type.
 
     Parameters:
-        curvature_type: Type of curvature approx. ('full', 'diagonal', 'low_rank').
-        mv: Function representing the curvature.
-        **kwargs,
+        curvature_type (str): Type of curvature approximation ('full', 'diagonal',
+            'low_rank').
+        mv (Callable): Function representing the curvature.
+        **kwargs: Additional parameters required for specific curvature methods,
+            including:
+            - layout (Union[int, None]): Defines the format of the layout
+                for matrix-vector products. If None or an integer, no
+                flattening/unflattening is used.
+
+    Returns:
+        Callable: A posterior function that calculates posterior covariance and scale
+            functions.
     """
-    # Get general variables
-    tree = kwargs.get("tree", None)
-    if tree is None:
-        msg = "Tree structure is required for full covariance."
+    if layout is not None and not isinstance(layout, int | PyTree):
+        msg = "Layout must be an integer, PyTree or None."
         raise ValueError(msg)
 
-    # Get terms
-    curv_est = CURVATURE_METHODS[curvature_type](mv, **kwargs)
-    flatten, unflatten = create_pytree_flattener(tree)
+    # Create functions for flattening and unflattening if required
+    if layout is None or isinstance(layout, int):
+        flatten = unflatten = None
+    else:
+        # Use custom flatten/unflatten functions for complex pytrees
+        flatten, unflatten = create_pytree_flattener(layout)
 
-    def posterior_function(**kwargs):
-        prec = CURVATURE_PRIOR_METHODS[curvature_type](curv_est=curv_est, **kwargs)
-        scale, state = CURVATURE_INVERSE_METHODS[curvature_type](prec)
-        cov = CURVATURE_COV_METHODS[curvature_type](state)
+    # Retrieve the curvature estimator based on the provided type
+    curv_estimator = CURVATURE_METHODS[curvature_type](mv, layout=layout, **kwargs)
+
+    def posterior_function(**posterior_kwargs) -> dict[str, any]:
+        """Posterior function to compute covariance and scale-related functions.
+
+        Parameters:
+            **posterior_kwargs: Additional arguments required for posterior
+                computations.
+
+        Returns:
+            Dict[str, any]: Dictionary containing:
+                - 'state': Updated state of the posterior.
+                - 'cov_mv': Function to compute covariance matrix-vector product.
+                - 'scale_mv': Function to compute scale matrix-vector product.
+        """
+        # Calculate posterior precision.
+        precision = CURVATURE_PRIOR_METHODS[curvature_type](
+            curv_est=curv_estimator, **posterior_kwargs
+        )
+
+        # Calculate posterior state
+        state = CURVATURE_TO_POSTERIOR_STATE[curvature_type](precision)
+
+        # Extract matrix-vector product
+        scale_mv_from_state = CURVATURE_STATE_TO_SCALE[curvature_type]
+        cov_mv_from_state = CURVATURE_STATE_TO_COV[curvature_type]
+
         return {
-            "cov_mv": wrap_function(fn=cov, input_fn=flatten, output_fn=unflatten),
-            "scale_mv": wrap_function(fn=scale, input_fn=flatten, output_fn=unflatten)
-            if kwargs.get("return_scale", False)
-            else None,
+            "state": state,
+            "cov_mv": wrap_factory(cov_mv_from_state, flatten, unflatten),
+            "scale_mv": wrap_factory(scale_mv_from_state, flatten, unflatten),
         }
 
     return posterior_function

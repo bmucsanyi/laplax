@@ -1,4 +1,4 @@
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, List
 
 import equinox as eqx
 import jax
@@ -147,12 +147,12 @@ class EquinoxRegressionTask(BaseRegressionTask):
             out_channels=self.out_channels,
             keys=keys,
         )
-        self.params = eqx.filter(self.model, eqx.is_inexact_array)
+        self.params, self.static = eqx.partition(self.model, eqx.is_array)
 
     def get_model_fn(self):
         def model_fn(params, input):
-            updated_model = eqx.tree_at(lambda m: m, self.model, params)
-            return updated_model(input)
+            new_model = eqx.combine(params, self.static)
+            return new_model(input)
 
         return model_fn
 

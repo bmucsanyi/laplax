@@ -55,6 +55,7 @@ def create_ggn_mv(
     params: dict,
     data: tuple[jax.Array, jax.Array],
     loss_fn: str | Callable,
+    **kwargs,
 ) -> Callable:
     """Return a GGN-mv function for a given model, data, and loss function.
 
@@ -63,6 +64,8 @@ def create_ggn_mv(
         params: Model parameters for model_fn.
         data: (input, target) tuple.
         loss_fn: loss function, either regression, cross_entropy, or callable.
+        **kwargs:
+            - lmap_ggn_mv: Defining the chunk size for looping over the data.
 
     Returns:
         ggn_mv (callable): Function taking a vector and returning the GGN-mv.
@@ -91,6 +94,9 @@ def create_ggn_mv(
             )  # TODO(2bys): Do we want this constrain?
             return mv_ggn_ptw(input, target, vec)
 
-        return jax.lax.psum(lmap(mv_ggn_ptw_w_vec, data), axis_name=0)
+        return jax.lax.psum(
+            lmap(mv_ggn_ptw_w_vec, data, batch_size=kwargs.get("lmap_ggn_mv", "data")),
+            axis_name=0,
+        )
 
     return mv_ggn

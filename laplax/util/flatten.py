@@ -49,15 +49,15 @@ def create_pytree_flattener(tree: PyTree):
 def create_partial_pytree_flattener(tree: PyTree):
     """Create flatten and unflatten functions for partial PyTree arrays.
 
-    Assumes an PyTree representing an array, where in each leaf the first
-    dimension gives the row index, while the remaining might need to be
+    Assumes an PyTree representing an array, where in each leaf the last
+    dimension gives the column index, while the remaining might need to be
     flattened.
     """
 
     def flatten(tree: PyTree) -> jax.Array:
         flat, _ = jax.tree_util.tree_flatten(tree)
         return jnp.concatenate(
-            [leaf.reshape(leaf.shape[0], -1) for leaf in flat], axis=1
+            [leaf.reshape(-1, leaf.shape[-1]) for leaf in flat], axis=0
         )
 
     # Get shapes and tree def for unflattening
@@ -164,7 +164,7 @@ def wrap_function(
     output_fn: Callable | None = None,
     argnums: int = 0,
 ) -> Callable:
-    def wrapper(*args, **kwargs):
+    def wrapper(*args, **kwargs):  # noqa: ANN002
         # Use the identity function if input_fn or output_fn is None
         effective_input_fn = input_fn or identity
         effective_output_fn = output_fn or identity
@@ -183,7 +183,19 @@ def wrap_function(
     return wrapper
 
 
-def inflate_and_flatten(flatten_fn: callable, inflate_fn: callable, argnums: int = 0):
+def wrap_factory(
+    factory: Callable,
+    input_fn: Callable | None = None,
+    output_fn: Callable | None = None,
+) -> any:
+    def wrapped_factory(*args, **kwargs) -> Callable:  # noqa: ANN002
+        fn = factory(*args, **kwargs)
+        return wrap_function(fn, input_fn, output_fn)
+
+    return wrapped_factory
+
+
+def inflate_and_flatten(flatten_fn: Callable, inflate_fn: Callable, argnums: int = 0):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):  # noqa: ANN002

@@ -1,5 +1,7 @@
 # Development
 local_*
+.ruff_cache
+.idea
 
 # Extensions
 *.ipynb

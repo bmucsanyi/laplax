@@ -15,7 +15,7 @@ def calibration_metric(**predictions):
     return jnp.abs(estimate_q(**predictions) - 1)
 
 
-def evaluate_for_given_prior_prec(
+def evaluate_for_given_prior_arguments(
     *,
     data: tuple[jax.Array, jax.Array],
     set_prob_predictive=Callable,
@@ -27,7 +27,11 @@ def evaluate_for_given_prior_prec(
     def evaluate_data(dp: tuple[jax.Array]) -> dict:
         return {**prob_predictive(dp["input"]), "target": dp["target"]}
 
-    res = metric(**lmap(evaluate_data, data))
+    res = metric(
+        **lmap(
+            evaluate_data, data, batch_size=kwargs.get("lmap_eval_prior_prec", "data")
+        )
+    )
     return res
 
 
@@ -45,7 +49,7 @@ def grid_search(
     for iteration, prior_prec in enumerate(prior_prec_interval):
         start_time = time.perf_counter()
         try:
-            result = objective(prior_prec, data)
+            result = objective(prior_arguments={"prior_prec": prior_prec}, data=data)
         except ValueError as error:
             print(f"Caught an exception in validate: {error}")  # noqa: T201
             result = float("inf")
