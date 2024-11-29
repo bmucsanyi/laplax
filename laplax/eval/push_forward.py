@@ -110,13 +110,13 @@ def set_mc_pushforward(  # noqa: PLR0913, PLR0917
     model_fn: Callable,
     mean: PyTree,
     posterior: Callable,
-    prior_prec: float,
+    prior_arguments: dict,
     n_weight_samples: int,
     pushforward_functions: dict = DEFAULT_MC_FUNCTIONS,
     **kwargs,
 ) -> Callable:
     # Create weight sample function
-    posterior_state = posterior(prior_prec=prior_prec)
+    posterior_state = posterior(**prior_arguments)
     scale_mv = posterior_state["scale_mv"](posterior_state["state"])
 
     get_weight_sample = set_get_weight_sample(
@@ -221,12 +221,12 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
     model_fn: Callable,
     mean: PyTree,
     posterior: Callable,
-    prior_prec: float,
+    prior_arguments: dict,
     pushforward_functions: OrderedDict = DEFAULT_LIN_FINALIZE,
     **kwargs,
 ) -> Callable:
     # Create posterior state
-    posterior_state = posterior(prior_prec=prior_prec)
+    posterior_state = posterior(**prior_arguments)
 
     # Create push-forward functions
     def pf_jvp(input, vector):
