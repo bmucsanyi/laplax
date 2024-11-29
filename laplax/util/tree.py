@@ -8,6 +8,7 @@ from itertools import starmap
 import jax
 import jax.numpy as jnp
 
+from laplax.types import KeyType, PyTree
 from laplax.util.flatten import unravel_array_into_pytree
 from laplax.util.ops import lmap
 
@@ -16,7 +17,7 @@ from laplax.util.ops import lmap
 # ---------------------------------------------------------------
 
 
-def get_size(tree):
+def get_size(tree: PyTree) -> PyTree:
     flat, _ = jax.tree_util.tree_flatten(tree)
     return sum(math.prod(arr.shape) for arr in flat)
 
@@ -26,20 +27,20 @@ def get_size(tree):
 # ---------------------------------------------------------------
 
 
-def ones_like(tree):
+def ones_like(tree: PyTree) -> PyTree:
     return jax.tree.map(jnp.ones_like, tree)
 
 
-def zeros_like(tree):
+def zeros_like(tree: PyTree):
     return jax.tree.map(jnp.zeros_like, tree)
 
 
-def randn_like(key, tree):
+def randn_like(key: KeyType, tree: PyTree) -> PyTree:
     """Generates a White Noise PyTree in the form of given PyTree.
 
     Args:
         key : PRNGKey,
-        pytree: A PyTree of arrays, whose structure and shape will be used.
+        tree: A PyTree of arrays, whose structure and shape will be used.
 
     Returns:
         (PyTree) : A PyTree of random numbers with the same structure
@@ -60,7 +61,7 @@ def randn_like(key, tree):
     return jax.tree.unflatten(treedef, random_leaves)
 
 
-def basis_vector_from_index(idx, tree):
+def basis_vector_from_index(idx: int, tree: PyTree) -> PyTree:
     # Create a tree of zeros with the same structure
     zeros = zeros_like(tree)
 
@@ -92,20 +93,20 @@ def basis_vector_from_index(idx, tree):
     return jax.tree_util.tree_unflatten(tree_def, updated_flat)
 
 
-def eye_like_with_basis_vector(tree):
+def eye_like_with_basis_vector(tree: PyTree) -> PyTree:
     n_ele = get_size(tree)
     return lmap(partial(basis_vector_from_index, tree=tree), jnp.arange(n_ele))
 
 
-def eye_like(tree):
+def eye_like(tree: PyTree) -> PyTree:
     return unravel_array_into_pytree(tree, 1, jnp.eye(get_size(tree)))
 
 
-def tree_slice(tree, a, b):
+def tree_slice(tree: PyTree, a: int, b: int) -> PyTree:
     return jax.tree.map(operator.itemgetter(slice(a, b)), tree)
 
 
-def tree_vec_get(tree, idx):
+def tree_vec_get(tree: PyTree, idx: int) -> any:
     if isinstance(tree, jnp.ndarray):
         return tree[idx]  # Also works with arrays.
     # Column flat and get index
@@ -119,43 +120,43 @@ def tree_vec_get(tree, idx):
 # ---------------------------------------------------------------
 
 
-def add(tree1, tree2):
+def add(tree1: PyTree, tree2: PyTree) -> PyTree:
     return jax.tree.map(jnp.add, tree1, tree2)
 
 
-def neg(tree):
+def neg(tree: PyTree) -> PyTree:
     return jax.tree.map(jnp.negative, tree)
 
 
-def sub(tree1, tree2):
+def sub(tree1: PyTree, tree2: PyTree) -> PyTree:
     return add(tree1, neg(tree2))
 
 
-def sqrt(tree):
+def sqrt(tree: PyTree) -> PyTree:
     return jax.tree.map(jnp.sqrt, tree)
 
 
-def invert(tree):
+def invert(tree: PyTree) -> PyTree:
     return jax.tree.map(jnp.invert, tree)
 
 
-def mean(tree, **kwargs):
+def mean(tree: PyTree, **kwargs) -> PyTree:
     return jax.tree.map(partial(jnp.mean, **kwargs), tree)
 
 
-def std(tree, **kwargs):
+def std(tree: PyTree, **kwargs) -> PyTree:
     return jax.tree.map(partial(jnp.std, **kwargs), tree)
 
 
-def var(tree, **kwargs):
+def var(tree: PyTree, **kwargs) -> PyTree:
     return jax.tree.map(partial(jnp.var, **kwargs), tree)
 
 
-def cov(tree, **kwargs):
+def cov(tree: PyTree, **kwargs) -> PyTree:
     return jax.tree.map(partial(jnp.cov, **kwargs), tree)
 
 
-def tree_matvec(tree, vector):
+def tree_matvec(tree: PyTree, vector: jax.Array) -> PyTree:
     # Flatten the vector
     vec_flatten, vec_def = jax.tree.flatten(vector)
     n_vec_flatten = len(vec_flatten)
@@ -181,7 +182,7 @@ def tree_matvec(tree, vector):
     return jax.tree.map(lambda p: p @ vec_flatten, tree)
 
 
-def tree_partialmatvec(tree, vector):
+def tree_partialmatvec(tree: PyTree, vector: jax.Array) -> PyTree:
     return jax.tree.map(lambda arr: arr @ vector, tree)
 
 
@@ -190,5 +191,5 @@ def tree_partialmatvec(tree, vector):
 # ---------------------------------------------------------------
 
 
-def allclose(tree1, tree2):
+def allclose(tree1: PyTree, tree2: PyTree) -> bool:
     return jax.tree.all(jax.tree.map(jnp.allclose, tree1, tree2))

@@ -75,7 +75,7 @@ def laplax_dtype():
     return jnp.dtype(dtype)
 
 
-def precompute_list(func, items, option: str | bool | None = None):  # noqa: FBT001
+def precompute_list(func, items, option: str | bool | None = None, **kwargs):  # noqa: FBT001
     """Precomputes a list of operations or returns the original function.
 
     Args:
@@ -85,6 +85,8 @@ def precompute_list(func, items, option: str | bool | None = None):  # noqa: FBT
             - None: Uses the default precompute setting.
             - str: Determines the setting from an environment variable.
             - bool: Directly specifies whether to precompute.
+        **kwargs: Define additional key word arguments
+            - lmap_precompute: Define batch size for precomputation.
 
     Returns:
         A function to retrieve precomputed elements by index, or `func`.
@@ -97,7 +99,9 @@ def precompute_list(func, items, option: str | bool | None = None):  # noqa: FBT
         option = get_env_bool("LAPLAX_PRECOMPUTE_LIST", DEFAULT_PRECOMPUTE_LIST)
 
     if option:
-        precomputed = [func(item) for item in items]
+        precomputed = lmap(
+            func, items, batch_size=kwargs.get("lmap_precompute", "precompute")
+        )
 
         def get_element(index: int):
             return jax.tree_map(operator.itemgetter(index), precomputed)

@@ -27,7 +27,11 @@ def evaluate_for_given_prior_prec(
     def evaluate_data(dp: tuple[jax.Array]) -> dict:
         return {**prob_predictive(dp["input"]), "target": dp["target"]}
 
-    res = metric(**lmap(evaluate_data, data))
+    res = metric(
+        **lmap(
+            evaluate_data, data, batch_size=kwargs.get("lmap_eval_prior_prec", "data")
+        )
+    )
     return res
 
 

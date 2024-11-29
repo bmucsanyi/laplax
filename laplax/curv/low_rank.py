@@ -1,35 +1,46 @@
-from collections.abc import Callable
+"""Handles the actual low-rank approximation from a matrix-vector product."""
 
 import jax
 import jax.numpy as jnp
 from jax.experimental.sparse.linalg import lobpcg_standard
 
-from laplax.types import DType, KeyType
+from laplax.types import Callable, DType, KeyType
 
 # ---------------------------------------------------------------
-# Low rank approximations
+# Low Rank Approximations
 # ---------------------------------------------------------------
 
 
 def get_low_rank_large_eigenvalues(
     mv: Callable,
     key: KeyType,
-    maxiter: int,
     size: int,
+    maxiter: int,
     dtype: DType = jnp.float64,
 ) -> dict:
-    # Assert
-    if size < maxiter * 5:
-        print(
-            f"Warning: maxiter {maxiter} too large for size, "
-            f"reducing to {size // 5 - 1}."
-        )
-        maxiter = size // 5 - 1
+    """Computes a low-rank approximation focusing on the largest eigenvalues.
 
-    # Initialize lanczos
+    Args:
+        mv (Callable): Matrix-vector product function.
+        key (KeyType): PRNG key for random initialization.
+        size (int): Size of the input/output space.
+        maxiter (int): Number of iterations for the approximation.
+        dtype (DType): Data type for computations.
+
+    Returns:
+        dict: A dictionary containing:
+            - "U": Eigenvectors as a matrix.
+            - "S": Corresponding eigenvalues.
+    """
+    # Ensure maxiter is appropriate for the size
+    if size < maxiter * 5:
+        maxiter = max(1, size // 5 - 1)
+        print(f"Warning: Reduced maxiter to {maxiter} due to insufficient size.")  # noqa: T201
+
+    # Initialize random basis
     b = jax.random.normal(key, (size, maxiter), dtype=dtype)
 
-    # Run lanczos
+    # Perform LOBPCG for eigenvalues and eigenvectors
     eigenvals, eigenvecs, _ = lobpcg_standard(mv, b, m=maxiter)
 
     return {
@@ -38,33 +49,55 @@ def get_low_rank_large_eigenvalues(
     }
 
 
-def get_low_rank(
+def get_low_rank(  # noqa: D417, PLR0913, PLR0917
     mv: Callable,
     key: KeyType,
     size: int,
     maxiter: int = 20,
-    local_dtype_switch: bool = True,
     dtype: DType = jnp.float64,
-    **kwargs,
+    enable_local_dtype_switch: bool = True,  # noqa: FBT001, FBT002
+    **kwargs,  # noqa: ARG001
 ) -> dict:
-    """Handling low rank calculations."""
-    # Set local dtype if necessary
-    if local_dtype_switch and dtype != jnp.float64:
-        jax.config.update("jax_enable_x64", True)
-        local_dtype = jnp.float64
-    else:
-        local_dtype = dtype
+    """Handles low-rank approximations with optional precision adjustments.
 
-    # Get low rank
-    low_rank_tuple = get_low_rank_large_eigenvalues(
-        mv, maxiter=maxiter, size=size, key=key, dtype=local_dtype
+    Args:
+        mv (Callable): Matrix-vector product function.
+        key (KeyType): PRNG key for random initialization.
+        size (int): Size of the input/output space.
+        maxiter (int): Number of iterations for the approximation (default: 20).
+        dtype (DType): Desired data type for computations (default: float64).
+        enable_local_dtype_switch (bool): If True, temporarily enables higher precision.
+
+    Returns:
+        dict: A dictionary containing:
+            - "U": Eigenvectors as a matrix.
+            - "S": Corresponding eigenvalues.
+    """
+    # Configure local dtype if necessary
+    original_dtype_config = jax.config.read("jax_enable_x64")
+    local_dtype = dtype
+
+    if enable_local_dtype_switch and dtype != jnp.float64:
+        jax.config.update("jax_enable_x64", True)  # noqa: FBT003
+        local_dtype = jnp.float64
+
+    # Compute low-rank approximation
+    low_rank_result = get_low_rank_large_eigenvalues(
+        mv=mv,
+        key=key,
+        size=size,
+        maxiter=maxiter,
+        dtype=local_dtype,
     )
 
-    # Adjust dtype and set global dtype variable.
-    if dtype != local_dtype:
-        low_rank_tuple = jax.tree.map(dtype, low_rank_tuple)
+    # Convert back to desired dtype if different from local dtype
+    if local_dtype != dtype:
+        low_rank_result = jax.tree_map(lambda x: x.astype(dtype), low_rank_result)
 
-        if local_dtype_switch:
-            jax.config.update("jax_enable_x64", False)
+    # Restore original dtype configuration if it was changed
+    if enable_local_dtype_switch and original_dtype_config != jax.config.read(
+        "jax_enable_x64"
+    ):
+        jax.config.update("jax_enable_x64", original_dtype_config)
 
-    return low_rank_tuple
+    return low_rank_result

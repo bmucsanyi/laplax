@@ -25,7 +25,7 @@ def test_eval_metrics(curv_op, task):
     get_posterior = create_posterior_function(
         curv_op,
         ggn_mv,
-        tree=params,
+        layout=params,
         key=jax.random.key(20),
         maxiter=20,
     )

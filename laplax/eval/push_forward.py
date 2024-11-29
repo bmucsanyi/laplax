@@ -32,13 +32,17 @@ def get_normal_weight_samples(
     return util.tree.add(mean, scale_mv(util.tree.randn_like(key, mean)))
 
 
-def set_get_weight_sample(key, mean, scale_mv, n_weight_samples):
+def set_get_weight_sample(key, mean, scale_mv, n_weight_samples, **kwargs):
     keys = jax.random.split(key, n_weight_samples)
 
     def get_weight_sample(idx):
         return get_normal_weight_samples(keys[idx], mean, scale_mv)
 
-    return precompute_list(get_weight_sample, jnp.arange(n_weight_samples))
+    return precompute_list(
+        get_weight_sample,
+        jnp.arange(n_weight_samples),
+        option=kwargs.get("precompute_samples", "samples"),
+    )
 
 
 # -------------------------------------------------------------------------
@@ -109,9 +113,12 @@ def set_mc_pushforward(  # noqa: PLR0913, PLR0917
     prior_prec: float,
     n_weight_samples: int,
     pushforward_functions: dict = DEFAULT_MC_FUNCTIONS,
+    **kwargs,
 ) -> Callable:
     # Create weight sample function
-    scale_mv = posterior(prior_prec=prior_prec, return_scale=True)["scale_mv"]
+    posterior_state = posterior(prior_prec=prior_prec)
+    scale_mv = posterior_state["scale_mv"](posterior_state["state"])
+
     get_weight_sample = set_get_weight_sample(
         key,
         mean,
@@ -126,7 +133,11 @@ def set_mc_pushforward(  # noqa: PLR0913, PLR0917
             return model_fn(params=weight_sample, input=input)
 
         pred = model_fn(params=mean, input=input)
-        pred_ensemble = lmap(compute_pred_ptw, jnp.arange(n_weight_samples))
+        pred_ensemble = lmap(
+            compute_pred_ptw,
+            jnp.arange(n_weight_samples),
+            batch_size=kwargs.get("lmap_pred_ptw", "weight"),
+        )
 
         return finalize_functions(
             functions=pushforward_functions,
@@ -149,7 +160,7 @@ def lin_pred_var_fn(**kwargs):
 
     # Compute diagonal as variance
     _var = util.mv.diagonal(
-        _cov, size=math.prod(pred.shape)
+        _cov, layout=math.prod(pred.shape)
     )  # This assumes output is not a tree.
     return _var
 
@@ -165,7 +176,7 @@ def lin_pred_cov_fn(**kwargs):
     pred = kwargs.get("pred")
 
     # Compute diagonal as variance
-    cov = util.mv.todense(cov_mv, like=pred)
+    cov = util.mv.todense(cov_mv, layout=pred)
     return cov
 
 
@@ -175,7 +186,11 @@ def lin_n_samples_fn(n_samples: int = 5, **kwargs):
     weight_samples = kwargs.get("weight_samples")
 
     # Get weight samples
-    return lmap(lambda i: scale_mv(weight_samples(i)), jnp.arange(n_samples))
+    return lmap(
+        lambda i: scale_mv(weight_samples(i)),
+        jnp.arange(n_samples),
+        batch_size=kwargs.get("lmap_lin_samples", "weight"),
+    )
 
 
 DEFAULT_LIN_FINALIZE = OrderedDict([
@@ -188,14 +203,17 @@ DEFAULT_LIN_FINALIZE = OrderedDict([
 ])
 
 
-def set_output_cov_mv(mv, input, jvp, vjp):
-    def cov_mv(vec):
-        return jvp(input, mv.get("cov_mv")(vjp(input, vec)[0]))
+def set_output_cov_mv(posterior_state, input, jvp, vjp):
+    cov_mv = posterior_state["cov_mv"](posterior_state["state"])
+    scale_mv = posterior_state["scale_mv"](posterior_state["state"])
 
-    def cov_scale_mv(vec):
-        return jvp(input, mv.get("scale_mv")(vec))
+    def output_cov_mv(vec):
+        return jvp(input, cov_mv(vjp(input, vec)[0]))
 
-    return {"cov_mv": cov_mv, "scale_mv": cov_scale_mv if mv.get("scale_mv") else None}
+    def output_cov_scale_mv(vec):
+        return jvp(input, scale_mv(vec))
+
+    return {"cov_mv": output_cov_mv, "scale_mv": output_cov_scale_mv}
 
 
 def set_lin_pushforward(  # noqa: PLR0913, PLR0917
@@ -207,11 +225,8 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
     pushforward_functions: OrderedDict = DEFAULT_LIN_FINALIZE,
     **kwargs,
 ) -> Callable:
-    # Create mv function
-    mv = posterior(
-        prior_prec=prior_prec,
-        return_scale=("samples" in pushforward_functions),
-    )
+    # Create posterior state
+    posterior_state = posterior(prior_prec=prior_prec)
 
     # Create push-forward functions
     def pf_jvp(input, vector):
@@ -227,9 +242,13 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
 
     # Create scale mv
     if "samples" in pushforward_functions:
-        n_samples = kwargs.get("n_samples")
+        n_samples = kwargs.pop("n_samples")
         get_weight_samples = set_get_weight_sample(
-            key, mean, mv.get("scale_mv"), n_samples
+            key,
+            mean,
+            posterior_state["scale_mv"](posterior_state["state"]),
+            n_samples,
+            **kwargs,
         )
     else:
         get_weight_samples = None
@@ -243,10 +262,11 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
         return finalize_functions(
             functions=pushforward_functions,
             results={"pred": pred},
-            **set_output_cov_mv(mv, input=input, jvp=pf_jvp, vjp=pf_vjp),
+            **set_output_cov_mv(posterior_state, input=input, jvp=pf_jvp, vjp=pf_vjp),
             input=input,
             weight_samples=get_weight_samples,
             n_samples=n_samples,
+            **kwargs,
         )
 
     return prob_predictive

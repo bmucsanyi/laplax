@@ -1,14 +1,13 @@
 """Often used types defined in one place."""
 
-import collections.abc as cabc
-from typing import Any
+from collections.abc import Callable  # noqa: F401
+from typing import Any  # noqa: F401
 
 import jax
+from jaxtyping import PRNGKeyArray, PyTree  # noqa: F401
 
 # General types
-Callable = cabc.Callable
-KeyType = jax._src.prng.PRNGKeyArray  # noqa: SLF001
+KeyType = PRNGKeyArray
 DType = jax.typing.DTypeLike
 ShapeType = tuple[int, ...]
-PyTree = dict  # TODO(2bys): Find the proper way of defining this type.
 PyTreeDef = jax.tree_util.PyTreeDef

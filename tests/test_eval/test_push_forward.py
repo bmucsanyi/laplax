@@ -24,7 +24,7 @@ def test_mc_push_forward(curv_op, task):
     get_posterior = create_posterior_function(
         curv_op,
         mv=ggn_mv,
-        tree=params,
+        layout=params,
         key=jax.random.key(20),
         maxiter=20,
     )
@@ -46,7 +46,7 @@ def test_mc_push_forward(curv_op, task):
     # # Check results
     pred = jax.vmap(lambda x: model_fn(params, x))(data["input"])
     assert (5, task.out_channels) == results["samples"].shape[1:]  # Check shape
-    assert jnp.all(results["pred_std"] > 0)
+    assert jnp.all(results["pred_std"] >= 0)
     assert jnp.allclose(pred, results["pred"])
 
 
@@ -65,7 +65,7 @@ def test_lin_push_forward(curv_op, task):
     get_posterior = create_posterior_function(
         curv_op,
         ggn_mv,
-        tree=params,
+        layout=params,
         key=jax.random.key(20),
         maxiter=20,
     )

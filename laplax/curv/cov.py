@@ -19,10 +19,10 @@ from laplax.util.mv import diagonal, todense
 # -----------------------------------------------------------------------
 
 
-def create_full_curvature(mv: Callable, tree: PyTree, **kwargs):
+def create_full_curvature(mv: Callable, layout: PyTree, **kwargs):
     """Generate a full curvature approximation."""
     del kwargs
-    curv_est = todense(mv, like=tree)
+    curv_est = todense(mv, layout=layout)
     flatten_partial_tree, _ = create_partial_pytree_flattener(curv_est)
     return flatten_partial_tree(curv_est)
 
@@ -77,7 +77,7 @@ def full_state_to_cov(state: dict) -> jax.Array:
 
 def create_diagonal_curvature(mv: Callable, **kwargs):
     """Generate a diagonal curvature."""
-    curv_diagonal = diagonal(mv, tree=kwargs.get("tree"))
+    curv_diagonal = diagonal(mv, layout=kwargs.get("layout"))
     return curv_diagonal
 
 
@@ -112,9 +112,9 @@ def diag_state_to_cov(state: dict) -> Callable:
 
 def create_low_rank_curvature(mv: Callable, **kwargs):
     """Generate a lcreate_pytree_flattener, ow-rank curvature approximations."""
-    tree = kwargs.get("tree")
-    flatten, unflatten = create_pytree_flattener(tree)
-    nparams = util.tree.get_size(tree)
+    layout = kwargs.get("layout")
+    flatten, unflatten = create_pytree_flattener(layout)
+    nparams = util.tree.get_size(layout)
     mv = jax.vmap(
         wrap_function(fn=mv, input_fn=unflatten, output_fn=flatten),
         in_axes=-1,
@@ -209,7 +209,7 @@ CURVATURE_STATE_TO_COV = {
 
 
 def create_posterior_function(
-    curvature_type: str, mv: Callable, structure: int | PyTree | None = None, **kwargs
+    curvature_type: str, mv: Callable, layout: int | PyTree | None = None, **kwargs
 ) -> Callable:
     """Factory function to create posterior covariance functions based on curv. type.
 
@@ -219,7 +219,7 @@ def create_posterior_function(
         mv (Callable): Function representing the curvature.
         **kwargs: Additional parameters required for specific curvature methods,
             including:
-            - structure_format (Union[int, None]): Defines the format of the structure
+            - layout (Union[int, None]): Defines the format of the layout
                 for matrix-vector products. If None or an integer, no
                 flattening/unflattening is used.
 
@@ -227,19 +227,19 @@ def create_posterior_function(
         Callable: A posterior function that calculates posterior covariance and scale
             functions.
     """
-    if structure is not None and not isinstance(structure, int | PyTree):
-        msg = "structure must be an integer, a tuple, PyTree or None."
+    if layout is not None and not isinstance(layout, int | PyTree):
+        msg = "Layout must be an integer, PyTree or None."
         raise ValueError(msg)
 
     # Create functions for flattening and unflattening if required
-    if structure is None or isinstance(structure, int):
+    if layout is None or isinstance(layout, int):
         flatten = unflatten = None
     else:
         # Use custom flatten/unflatten functions for complex pytrees
-        flatten, unflatten = create_pytree_flattener(structure)
+        flatten, unflatten = create_pytree_flattener(layout)
 
     # Retrieve the curvature estimator based on the provided type
-    curv_estimator = CURVATURE_METHODS[curvature_type](mv, **kwargs)
+    curv_estimator = CURVATURE_METHODS[curvature_type](mv, layout=layout, **kwargs)
 
     def posterior_function(**posterior_kwargs) -> dict[str, any]:
         """Posterior function to compute covariance and scale-related functions.

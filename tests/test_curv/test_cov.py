@@ -66,7 +66,7 @@ def test_posterior_covariance_est(task):
     # Get low rank terms
     curv_est = CURVATURE_METHODS[task.method](
         mv=task.arr_mv,
-        tree=task.tree_like,
+        layout=task.tree_like,
         key=task.key_curv_est,
         maxiter=task.rank,
     )
@@ -89,7 +89,7 @@ def test_posterior_covariance_est(task):
 
     # Get and test scale matrix
     scale_mv = CURVATURE_STATE_TO_SCALE[task.method](state)
-    scale_dense = util.mv.todense(scale_mv, like=task.tree_like)
+    scale_dense = util.mv.todense(scale_mv, layout=task.tree_like)
     assert jnp.allclose(
         scale_dense @ scale_dense.T @ prec_dense,
         jnp.eye(task.size),
@@ -99,7 +99,7 @@ def test_posterior_covariance_est(task):
 
     # Get and test covariance matrix
     cov_mv = CURVATURE_STATE_TO_COV[task.method](state)
-    cov_dense = util.mv.todense(cov_mv, like=task.tree_like)
+    cov_dense = util.mv.todense(cov_mv, layout=task.tree_like)
     assert jnp.allclose(
         cov_dense @ prec_dense, jnp.eye(task.size), atol=1e-6, rtol=1e-6
     )
