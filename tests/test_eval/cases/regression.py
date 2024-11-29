@@ -3,7 +3,8 @@ from typing import Any, Callable, List
 import equinox as eqx
 import jax
 import pytest_cases
-from flax import nnx, linen as nn
+from flax import linen as nn
+from flax import nnx
 
 
 def generate_data(key, input_shape, target_shape):

@@ -1,3 +1,5 @@
+"""Test for utility functions."""
+
 import jax
 import pytest_cases
 
@@ -36,7 +38,7 @@ def test_eval_metrics(curv_op, task):
         model_fn=model_fn,
         mean=params,
         posterior=get_posterior,
-        prior_prec=99999999.0,
+        prior_arguments={"prior_prec": 99999999.0},
         n_samples=5,  # TODO(2bys): Find a better way of setting this.
     )
 
