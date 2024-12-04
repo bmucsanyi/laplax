@@ -1,6 +1,6 @@
 """Often used types defined in one place."""
 
-from collections.abc import Callable  # noqa: F401
+from collections.abc import Callable, Iterable  # noqa: F401
 from typing import Any  # noqa: F401
 
 import jax
