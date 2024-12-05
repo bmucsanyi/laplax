@@ -20,6 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "jax",
+    "jaxtyping"
 ]
 description = "Laplace approximations in JAX."
 dynamic = ["version"]
@@ -34,7 +35,10 @@ requires-python = ">=3.10,<3.12"
 
 [project.optional-dependencies]
 dev = ["ruff", "jupyterlab", "pre-commit", "pytest", "tox-uv", "pyright"]
-
+test = [
+    "flax",
+    "equinox",
+]
 
 # PEP 518 Build System Configuration
 # See https://peps.python.org/pep-0518/
@@ -152,6 +156,16 @@ ignore = [
     # Assignments before return can emphasize the code's semantic structure
     "RET504",
     "S403",
+    # Currently set some simplifications
+    "ERA001", # no-commented out code
+    "D102", # no docstrings
+    "ANN401", # no type hints
+    "ANN202", # no type hints
+    "ANN001", # no type hints
+    "ANN003", # no type hints
+    "ANN201", # no type hints
+    "D103", # no docstrings
+    "TD003", #Found TODO in code
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
