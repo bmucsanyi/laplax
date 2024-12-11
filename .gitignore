@@ -9,6 +9,9 @@ local_*
 *.egg-info
 *.pyc
 
+# Example notebooks
+!examples/0001_low_rank_excurse.ipynb
+
 # Directories
 .tox
 
