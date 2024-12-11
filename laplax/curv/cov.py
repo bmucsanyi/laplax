@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from laplax import util
-from laplax.curv.low_rank import get_low_rank
+from laplax.curv.low_rank import get_low_rank_approximation
 from laplax.types import Callable, PyTree
 from laplax.util.flatten import (
     create_partial_pytree_flattener,
@@ -111,7 +111,7 @@ def diag_state_to_cov(state: dict) -> Callable:
 
 
 def create_low_rank_curvature(mv: Callable, **kwargs):
-    """Generate a lcreate_pytree_flattener, ow-rank curvature approximations."""
+    """Generate a create_pytree_flattener, low-rank curvature approximations."""
     layout = kwargs.get("layout")
     flatten, unflatten = create_pytree_flattener(layout)
     nparams = util.tree.get_size(layout)
@@ -120,7 +120,7 @@ def create_low_rank_curvature(mv: Callable, **kwargs):
         in_axes=-1,
         out_axes=-1,
     )  # Needs matmul structure.
-    low_rank_terms = get_low_rank(mv, size=nparams, **kwargs)
+    low_rank_terms = get_low_rank_approximation(mv, size=nparams, **kwargs)
 
     return low_rank_terms
 
