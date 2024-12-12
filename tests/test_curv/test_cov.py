@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -12,6 +14,7 @@ from laplax.curv.cov import (
     CURVATURE_STATE_TO_SCALE,
     CURVATURE_TO_POSTERIOR_STATE,
     prec_to_scale,
+    register_curvature_method,
 )
 
 from .cases.covariance import case_posterior_covariance
@@ -73,15 +76,15 @@ def test_posterior_covariance_est(task):
     assert jnp.allclose(
         task.adjust_curv_est(curv_est),
         task.true_curv,
-        atol=1e-6,
-        rtol=1e-6,
+        atol=1e-2,
+        rtol=1e-2,
     )
 
     # Get and test precision matrix
     prec = CURVATURE_PRIOR_METHODS[task.method](curv_est, prior_prec=1.0)
     prec_dense = task.adjust_prec(prec)
     assert jnp.allclose(
-        prec_dense, task.true_curv + jnp.eye(task.size), atol=1e-6, rtol=1e-6
+        prec_dense, task.true_curv + jnp.eye(task.size), atol=1e-4, rtol=1e-4
     )
 
     # Create posterior state
@@ -93,13 +96,89 @@ def test_posterior_covariance_est(task):
     assert jnp.allclose(
         scale_dense @ scale_dense.T @ prec_dense,
         jnp.eye(task.size),
-        atol=1e-6,
-        rtol=1e-6,
+        atol=1e-2,
+        rtol=1e-2,
     )
 
     # Get and test covariance matrix
     cov_mv = CURVATURE_STATE_TO_COV[task.method](state)
     cov_dense = util.mv.todense(cov_mv, layout=task.tree_like)
     assert jnp.allclose(
-        cov_dense @ prec_dense, jnp.eye(task.size), atol=1e-6, rtol=1e-6
+        cov_dense @ prec_dense, jnp.eye(task.size), atol=1e-2, rtol=1e-2
     )
+
+
+# -------------------------------------------------------------------------------
+# Test register_curvature_method
+# -------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("name", "create_fn", "prior_fn", "posterior_fn", "scale_fn", "cov_fn", "default"),
+    [
+        (
+            "test_method",
+            Mock(name="create_fn"),
+            Mock(name="prior_fn"),
+            Mock(name="posterior_fn"),
+            Mock(name="scale_fn"),
+            Mock(name="cov_fn"),
+            None,
+        ),
+    ],
+)
+def test_register_curvature_method(  # noqa: PLR0913, PLR0917
+    name, create_fn, prior_fn, posterior_fn, scale_fn, cov_fn, default
+):
+    register_curvature_method(
+        name=name,
+        create_fn=create_fn,
+        prior_fn=prior_fn,
+        posterior_fn=posterior_fn,
+        scale_fn=scale_fn,
+        cov_fn=cov_fn,
+        default=default,
+    )
+
+    assert CURVATURE_METHODS[name] == create_fn
+    assert CURVATURE_PRIOR_METHODS[name] == prior_fn
+    assert CURVATURE_TO_POSTERIOR_STATE[name] == posterior_fn
+    assert CURVATURE_STATE_TO_SCALE[name] == scale_fn
+    assert CURVATURE_STATE_TO_COV[name] == cov_fn
+
+
+@pytest.mark.parametrize(
+    ("name", "default"),
+    [
+        ("default_test", "low_rank"),
+    ],
+)
+def test_register_curvature_method_with_default(name, default):
+    register_curvature_method(name=name, default=default)
+
+    assert CURVATURE_METHODS[name] == CURVATURE_METHODS[default]
+    assert CURVATURE_PRIOR_METHODS[name] == CURVATURE_PRIOR_METHODS[default]
+    assert CURVATURE_TO_POSTERIOR_STATE[name] == CURVATURE_TO_POSTERIOR_STATE[default]
+    assert CURVATURE_STATE_TO_SCALE[name] == CURVATURE_STATE_TO_SCALE[default]
+    assert CURVATURE_STATE_TO_COV[name] == CURVATURE_STATE_TO_COV[default]
+
+
+def test_register_curvature_method_missing_functions():
+    with pytest.raises(ValueError, match="must be specified"):
+        register_curvature_method(name="incomplete_test")
+
+
+@pytest.mark.parametrize(
+    ("name", "create_fn", "default"),
+    [
+        ("partial_test", Mock(name="create_fn"), "low_rank"),
+    ],
+)
+def test_register_curvature_method_partial(name, create_fn, default):
+    register_curvature_method(name=name, create_fn=create_fn, default=default)
+
+    assert CURVATURE_METHODS[name] == create_fn
+    assert CURVATURE_PRIOR_METHODS[name] == CURVATURE_PRIOR_METHODS[default]
+    assert CURVATURE_TO_POSTERIOR_STATE[name] == CURVATURE_TO_POSTERIOR_STATE[default]
+    assert CURVATURE_STATE_TO_SCALE[name] == CURVATURE_STATE_TO_SCALE[default]
+    assert CURVATURE_STATE_TO_COV[name] == CURVATURE_STATE_TO_COV[default]

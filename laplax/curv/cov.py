@@ -273,3 +273,66 @@ def create_posterior_function(
         }
 
     return posterior_function
+
+
+# ----------------------------------------------------------------------------------
+# Register new curvature methods
+# ----------------------------------------------------------------------------------
+
+
+def register_curvature_method(  # noqa: PLR0913
+    name: str,
+    *,
+    create_fn: Callable | None = None,
+    prior_fn: Callable | None = None,
+    posterior_fn: Callable | None = None,
+    scale_fn: Callable | None = None,
+    cov_fn: Callable | None = None,
+    default: str | None = None,
+):
+    """Register a new curvature method with optional custom functions.
+
+    Parameters:
+        name (str): Name of the new curvature method.
+        create_fn (Callable, optional): Custom curvature creation function.
+        prior_fn (Callable, optional): Custom prior function.
+        posterior_fn (Callable, optional): Custom posterior state function.
+        scale_fn (Callable, optional): Custom state-to-scale function.
+        cov_fn (Callable, optional): Custom state-to-cov function.
+        default (str, optional): Default method to inherit from if custom functions
+            are not provided.
+
+    Raises:
+        ValueError: If neither a default method is provided nor all required
+            functions are specified.
+    """
+    # Check whether default is given
+    if default is None and not all((
+        create_fn,
+        prior_fn,
+        posterior_fn,
+        scale_fn,
+        cov_fn,
+    )):
+        missing_functions = [
+            fn_name
+            for fn_name, fn in zip(
+                ["create_fn", "prior_fn", "posterior_fn", "scale_fn", "cov_fn"],
+                [create_fn, prior_fn, posterior_fn, scale_fn, cov_fn],
+                strict=True,
+            )
+            if fn is None
+        ]
+        msg = (
+            "Either a default method must be provided or the following functions must "
+            f"be specified: {', '.join(missing_functions)}."
+        )
+        raise ValueError(msg)
+
+    CURVATURE_METHODS[name] = create_fn or CURVATURE_METHODS[default]
+    CURVATURE_PRIOR_METHODS[name] = prior_fn or CURVATURE_PRIOR_METHODS[default]
+    CURVATURE_TO_POSTERIOR_STATE[name] = (
+        posterior_fn or CURVATURE_TO_POSTERIOR_STATE[default]
+    )
+    CURVATURE_STATE_TO_SCALE[name] = scale_fn or CURVATURE_STATE_TO_SCALE[default]
+    CURVATURE_STATE_TO_COV[name] = cov_fn or CURVATURE_STATE_TO_COV[default]
