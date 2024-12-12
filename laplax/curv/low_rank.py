@@ -27,7 +27,7 @@ def get_low_rank_approximation(  # noqa: PLR0913, PLR0917
     calc_dtype: DType = jnp.float64,
     return_dtype: DType = jnp.float32,
     tol: float | None = None,
-    A_jittable: bool = True,  # noqa: FBT001, FBT002
+    mv_jittable: bool = True,  # noqa: FBT001, FBT002
     **kwargs,
 ) -> dict:
     """Computes a low-rank approximation using the LOBPCG algorithm.
@@ -53,7 +53,7 @@ def get_low_rank_approximation(  # noqa: PLR0913, PLR0917
             Desired output data type for results. Default is float32.
         tol (float | None, optional):
             Tolerance for convergence. If None, uses default machine epsilon.
-        A_jittable (bool, optional):
+        mv_jittable (bool, optional):
             If True, enables JIT compilation for LOBPCG. Default is True.
         **kwargs: Not needed.
 
@@ -93,7 +93,7 @@ def get_low_rank_approximation(  # noqa: PLR0913, PLR0917
         tol=tol,
         calc_dtype=calc_dtype,
         a_dtype=mv_dtype,
-        A_jittable=A_jittable,
+        A_jittable=mv_jittable,
     )
 
     # Prepare the results

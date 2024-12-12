@@ -10,7 +10,7 @@ local_*
 *.pyc
 
 # Example notebooks
-!examples/0001_low_rank_excurse.ipynb
+!examples/0001_neural_tangent_kernel.ipynb
 
 # Directories
 .tox

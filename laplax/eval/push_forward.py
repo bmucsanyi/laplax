@@ -270,3 +270,65 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
         )
 
     return prob_predictive
+
+
+# ------------------------------------------------------------------------
+# NTK
+# ------------------------------------------------------------------------
+
+
+def set_ntk(
+    model_fn: Callable,
+    mean: PyTree,
+    posterior: Callable,
+    prior_arguments: dict,
+    **kwargs,
+) -> Callable:
+    """Constructs the neural tangent kernel (NTK) using a posterior distribution.
+
+    Args:
+        model_fn (Callable): A function representing the model whose NTK is computed.
+        mean (PyTree): The mean parameters of the model.
+        posterior (Callable): A function returning the posterior state and covariance.
+        prior_arguments (dict): Arguments required to initialize the posterior.
+        **kwargs: Additional optional arguments:
+            - dense (bool): Whether to return a dense NTK matrix.
+            - output_layout (optional): Layout specification for the dense matrix.
+
+    Returns:
+        Callable: A function that computes the NTK between two inputs.
+    """
+    # Create posterior state and covariance
+    posterior_state = posterior(**prior_arguments)
+    cov_mv = posterior_state["cov_mv"](posterior_state["state"])
+
+    # Push-forward functions
+    def pf_jvp(input, vector):
+        return jax.jvp(
+            lambda p: model_fn(params=p, input=input),
+            (mean,),
+            (vector,),
+        )[1]
+
+    def pf_vjp(input, vector):
+        out, vjp_fun = jax.vjp(lambda p: model_fn(params=p, input=input), mean)
+        return vjp_fun(vector.reshape(out.shape))
+
+    def create_ntk_mv(x1: jax.Array, x2: jax.Array):
+        def mv(vec: jax.Array):
+            return pf_jvp(x1, cov_mv(pf_vjp(x2, vec)[0]))
+
+        return mv
+
+    if kwargs.get("dense", False):
+        output_layout = kwargs.get("output_layout")
+        if output_layout:
+            return lambda x1, x2: util.mv.todense(
+                create_ntk_mv(x1, x2), layout=output_layout
+            )
+        msg = (
+            "Function should return a dense matrix, but no output layout is specified."
+        )
+        raise ValueError(msg)
+
+    return create_ntk_mv
