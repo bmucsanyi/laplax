@@ -10,7 +10,7 @@ local_*
 *.pyc
 
 # Example notebooks
-!examples/0001_neural_tangent_kernel.ipynb
+!examples/0001_posterior_gp_kernel.ipynb
 
 # Directories
 .tox
