@@ -9,6 +9,9 @@ local_*
 *.egg-info
 *.pyc
 
+# Example notebooks
+!examples/0001_posterior_gp_kernel.ipynb
+
 # Directories
 .tox
 

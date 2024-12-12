@@ -1,3 +1,5 @@
+"""Tests for grid search calibration."""
+
 from functools import partial
 
 import jax
@@ -8,7 +10,7 @@ from laplax.curv.cov import create_posterior_function
 from laplax.curv.ggn import create_ggn_mv
 from laplax.eval.calibrate import (
     calibration_metric,
-    evaluate_for_given_prior_prec,
+    evaluate_for_given_prior_arguments,
     optimize_prior_prec,
 )
 from laplax.eval.push_forward import set_lin_pushforward
@@ -44,9 +46,9 @@ def test_lin_push_forward(curv_op, task):
         n_samples=5,  # TODO(2bys): Find a better way of setting this.
     )
 
-    def calibration_objective(prior_prec, data):
-        return evaluate_for_given_prior_prec(
-            prior_prec=jnp.asarray(prior_prec),
+    def calibration_objective(prior_arguments, data):
+        return evaluate_for_given_prior_arguments(
+            prior_arguments=prior_arguments,
             data=data,
             set_prob_predictive=set_prob_predictive,
             metric=calibration_metric,
@@ -67,8 +69,10 @@ def test_lin_push_forward(curv_op, task):
     )
 
     # Calculate
-    true_val = calibration_objective(prior_prec=prior_prec, data=data)
+    true_val = calibration_objective(
+        prior_arguments={"prior_prec": prior_prec}, data=data
+    )
     comparison_prec = calibration_objective(
-        prior_prec=prior_prec_interval[-1], data=data
+        prior_arguments={"prior_prec": prior_prec_interval[-1]}, data=data
     )
     assert true_val <= comparison_prec
