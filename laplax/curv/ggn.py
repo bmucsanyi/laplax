@@ -19,10 +19,12 @@ def create_loss_hessian_mv(loss_fn: str | Callable) -> Callable:
     Create a function to compute the Hessian-vector product for a specified loss
     function.
 
+    $$ 5 + 5 = 10 $$
     Args:
         loss_fn (str | Callable):
             The loss function for which the Hessian-vector product is computed.
             Can be:
+
             - `"cross_entropy"`: Computes the Hessian-vector product for cross-entropy
                 loss.
             - `"regression"` or `"mse"`: Computes the Hessian-vector product for mean

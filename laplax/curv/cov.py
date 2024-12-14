@@ -34,6 +34,7 @@ def full_with_prior(curv_est: jax.Array, **kwargs):
 def prec_to_scale(prec: jax.Array) -> jax.Array:
     """Implementation of the corresponding torch function.
 
+    $$ 5 + 5 = 10 $$
     See: torch.distributions.multivariate_normal._precision_to_scale_tril.
     """
     Lf = jnp.linalg.cholesky(jnp.flip(prec, axis=(-2, -1)))
