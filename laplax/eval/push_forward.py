@@ -1,4 +1,4 @@
-"""Push-forward functions for weight space uncertainty.
+"""Pushforward functions for weight space uncertainty.
 
 This file contains the additional functions for pushing forward
 weight space uncertainty onto output uncertainty.
@@ -46,7 +46,7 @@ def set_get_weight_sample(key, mean, scale_mv, n_weight_samples, **kwargs):
 
 
 # -------------------------------------------------------------------------
-# Monte Carlo push-forward
+# Monte Carlo pushforward
 # -------------------------------------------------------------------------
 
 
@@ -149,7 +149,7 @@ def set_mc_pushforward(  # noqa: PLR0913, PLR0917
 
 
 # -------------------------------------------------------------------------
-# Linearized push-forward
+# Linearized pushforward
 # -------------------------------------------------------------------------
 
 
@@ -228,7 +228,7 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
     # Create posterior state
     posterior_state = posterior(**prior_arguments)
 
-    # Create push-forward functions
+    # Create pushforward functions
     def pf_jvp(input, vector):
         return jax.jvp(
             lambda p: model_fn(params=p, input=input),
@@ -273,36 +273,36 @@ def set_lin_pushforward(  # noqa: PLR0913, PLR0917
 
 
 # ------------------------------------------------------------------------
-# NTK
+# Posterior GP kernel
 # ------------------------------------------------------------------------
 
 
-def set_ntk(
+def set_posterior_gp_kernel(
     model_fn: Callable,
     mean: PyTree,
     posterior: Callable,
     prior_arguments: dict,
     **kwargs,
 ) -> Callable:
-    """Constructs the neural tangent kernel (NTK) using a posterior distribution.
+    """Constructs the posterior GP kernel induced by the weight-space Laplace posterior.
 
     Args:
-        model_fn (Callable): A function representing the model whose NTK is computed.
+        model_fn (Callable): A function representing the model whose kernel is computed.
         mean (PyTree): The mean parameters of the model.
         posterior (Callable): A function returning the posterior state and covariance.
         prior_arguments (dict): Arguments required to initialize the posterior.
         **kwargs: Additional optional arguments:
-            - dense (bool): Whether to return a dense NTK matrix.
+            - dense (bool): Whether to return a dense GP kernel matrix.
             - output_layout (optional): Layout specification for the dense matrix.
 
     Returns:
-        Callable: A function that computes the NTK between two inputs.
+        Callable: A function that computes the posterior GP kernel between two inputs.
     """
     # Create posterior state and covariance
     posterior_state = posterior(**prior_arguments)
     cov_mv = posterior_state["cov_mv"](posterior_state["state"])
 
-    # Push-forward functions
+    # Pushforward functions
     def pf_jvp(input, vector):
         return jax.jvp(
             lambda p: model_fn(params=p, input=input),
@@ -314,7 +314,7 @@ def set_ntk(
         out, vjp_fun = jax.vjp(lambda p: model_fn(params=p, input=input), mean)
         return vjp_fun(vector.reshape(out.shape))
 
-    def create_ntk_mv(x1: jax.Array, x2: jax.Array):
+    def create_kernel_mv(x1: jax.Array, x2: jax.Array):
         def mv(vec: jax.Array):
             return pf_jvp(x1, cov_mv(pf_vjp(x2, vec)[0]))
 
@@ -324,11 +324,11 @@ def set_ntk(
         output_layout = kwargs.get("output_layout")
         if output_layout:
             return lambda x1, x2: util.mv.todense(
-                create_ntk_mv(x1, x2), layout=output_layout
+                create_kernel_mv(x1, x2), layout=output_layout
             )
         msg = (
             "Function should return a dense matrix, but no output layout is specified."
         )
         raise ValueError(msg)
 
-    return create_ntk_mv
+    return create_kernel_mv
