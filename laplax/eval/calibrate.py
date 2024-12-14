@@ -1,6 +1,7 @@
 # noqa: D100
 import time
 from collections.abc import Callable
+from typing import Iterable
 
 import jax
 import jax.numpy as jnp
@@ -38,7 +39,6 @@ def evaluate_for_given_prior_arguments(
 def grid_search(
     prior_prec_interval: jax.Array,
     objective: Callable[[float, tuple[jax.Array, jax.Array]], float],
-    data: tuple[jax.Array, jax.Array],
     patience: int = 5,
     max_iterations: int | None = None,
 ) -> float:
@@ -49,7 +49,9 @@ def grid_search(
     for iteration, prior_prec in enumerate(prior_prec_interval):
         start_time = time.perf_counter()
         try:
-            result = objective(prior_arguments={"prior_prec": prior_prec}, data=data)
+            result = objective(
+                prior_arguments={"prior_prec": prior_prec}
+            )  # TODO(2bys): Removed data input here, check with tests.
         except ValueError as error:
             print(f"Caught an exception in validate: {error}")  # noqa: T201
             result = float("inf")
@@ -94,11 +96,11 @@ def grid_search(
 
 def optimize_prior_prec(
     objective: Callable[[float, tuple[jax.Array, jax.Array]], float],
-    data: tuple[jax.Array, jax.Array],
     log_prior_prec_min: float = -5.0,
     log_prior_prec_max: float = 6.0,
     grid_size: int = 300,
 ) -> float:
+    # TODO(2bys): Removed data input here, should be part of the objective.
     prior_prec_interval = jnp.logspace(
         start=log_prior_prec_min,
         stop=log_prior_prec_max,
@@ -108,7 +110,6 @@ def optimize_prior_prec(
     prior_prec = grid_search(
         prior_prec_interval,
         objective,
-        data,
     )
 
     return prior_prec
