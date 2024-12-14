@@ -1,0 +1,64 @@
+site_name: "laplax"
+site_url: "https://laplax-org.github.io/laplax/"
+repo_url: "https://github.com/laplax-org/laplax"
+repo_name: "laplax-org/laplax"
+
+
+theme:
+  name: "material"
+  features:
+    - navigation.sections # Section are shown in the sidebar
+    - toc.integrate # Show table of contents on the left
+    - header.autohide # Hide the header when scrolling down
+  palette:
+    scheme: default
+    primary: teal
+    accent: cyan
+    toggle:
+      icon: material/weather-sunny
+      name: Switch to dark mode
+  icon:
+    repo: fontawesome/brands/github # Github logo
+    logo: "material/circle-opacity"
+
+extra_javascript: 
+    # The below two make MathJax work, see https://squidfunk.github.io/mkdocs-material/reference/mathjax/
+    - _static/mathjax.js
+    - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+markdown_extensions:
+    - pymdownx.arithmatex:  # Render LaTeX via MathJax
+        generic: true
+    - pymdownx.superfences  # Seems to enable syntax highlighting when used with the Material theme.
+    - pymdownx.details  # Allowing hidden expandable regions denoted by ???
+
+nav:
+  - Home: index.md
+  - Examples:
+    - Posterior GP Kernel: examples/0001_posterior_gp_kernel.ipynb
+  - API reference:
+    - Curvature: api/curvature.md
+plugins:
+  - search
+  - autorefs 
+  - mkdocstrings:
+      handlers: 
+        python:
+          setup_commands:
+            - import pytkdocs_tweaks
+            - pytkdocs_tweaks.main()
+          selection:
+            inherited_members: true
+          rendering:
+            show_root_heading: true # show the root heading, e.g. "laplax.curv.ggn"
+            show_root_full_path: true # show the full path, e.g. "laplax.curv.ggn.create_ggn_mv"
+            show_if_no_docstring: true # show the function even if it has no docstring
+            show_signature_annotations: true # show the signature annotations, e.g. "(data: Array, model: Model) -> Array"
+            show_source: true # show the source code of the function            
+            members_order: source # order the members by source code, not alphabetically
+            heading_level: 4
+  - mknotebooks:
+      execute: false
+      write_markdown: true 
+      enable_default_jupyter_cell_styling: true
+
