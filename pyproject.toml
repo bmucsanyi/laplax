@@ -18,10 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Operating System :: OS Independent",
 ]
-dependencies = [
-    "jax",
-    "jaxtyping"
-]
+dependencies = ["jax", "jaxtyping"]
 description = "Laplace approximations in JAX."
 dynamic = ["version"]
 keywords = [
@@ -34,11 +31,16 @@ readme = "README.md"
 requires-python = ">=3.10,<3.12"
 
 [project.optional-dependencies]
-dev = ["ruff", "jupyterlab", "pre-commit", "pytest", "tox-uv", "pyright"]
-test = [
-    "flax",
-    "equinox",
+dev = [
+    "ruff",
+    "jupyterlab",
+    "pre-commit",
+    "pytest",
+    "tox-uv",
+    "pyright",
+    "pytest-cases",
 ]
+test = ["flax", "equinox"]
 
 # PEP 518 Build System Configuration
 # See https://peps.python.org/pep-0518/
@@ -51,16 +53,14 @@ build-backend = "setuptools.build_meta"
 packages = ["laplax"]
 
 [tool.setuptools.dynamic]
-version = {attr = "laplax.__version__"}
+version = { attr = "laplax.__version__" }
 
 # Testing Configuration
 # See https://docs.pytest.org/en/stable/reference/customize.html
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = [
-    "--import-mode=importlib",
-]
+addopts = ["--import-mode=importlib"]
 
 # Linting Configuration
 # See https://docs.astral.sh/ruff/rules/#legend
@@ -68,63 +68,60 @@ addopts = [
 [tool.ruff]
 preview = true
 extend-include = ["*.ipynb"]
-exclude = [
-    ".git",
-    "__pycache__",
-]
+exclude = [".git", "__pycache__"]
 target-version = "py310"
 
 [tool.ruff.lint]
 select = [
-    "ARG",  # flake8-unused-arguments
-    "ASYNC",  # flake8-async
-    "ANN",  # flake8-annotations
-    "B",  # flake8-bugbear
-    "BLE",  # flake8-blind-except
-    "C4",  # flake8-comprehensions
-    "C90",  # mccabe
-    "COM",  # flake8-commas
-    "D",  # pydocstyle
-    "DTZ",  # flake8-datetimez
-    "E",  # pycodestyle error
-    "EM",  # flake8-errmsg
-    "ERA",  # eradicate
-    "F",  # Pyflakes
-    "FBT",  # flake8-boolean-trap
-    "FLY",  # flynt
-    "FURB",  # refurb
-    "G",  # flake80logging-format
-    "I",  # isort
-    "ICN",  # flake8-import-conventions
-    "INT",  # flake8-gettext
-    "ISC",  # flake8-implicit-str-concat
-    "LOG",  # flake8-logging
-    "N",  # pep8-naming
-    "NPY",  # NumPy
-    "PERF",  # Perflint
-    "PGH",  # pygrep-hooks
-    "PIE",  # flake8-pie
-    "PL",  # Pylint
-    "PT",  # flake8-pytest-style
-    "PTH",  # flake8-use-pathlib
-    "PYI",  # flake8-pyi
-    "Q",  # flake8-quotes
-    "RET",  # flake8-return
-    "RSE",  # flake8-raise
-    "RUF",  # Ruff
-    "S",  # flake8-bandit
-    "SLOT",  # flake8-slots
-    "T10",  # flake8-debugger
-    "T20",  # flake8-print
-    "TCH",  # flake8-type-checking
-    "TD",  # flake8-todos
-    "TID",  # flake8-tidy-imports
-    "TRY",  # tryceratops
-    "SIM",  # flake8-simplify
-    "SLF",  # flake8-self
-    "UP",  # pyupgrade
-    "W",  # pycodestyle warning
-    "YTT",  # flake8-2020
+    "ARG", # flake8-unused-arguments
+    "ASYNC", # flake8-async
+    "ANN", # flake8-annotations
+    "B", # flake8-bugbear
+    "BLE", # flake8-blind-except
+    "C4", # flake8-comprehensions
+    "C90", # mccabe
+    "COM", # flake8-commas
+    "D", # pydocstyle
+    "DTZ", # flake8-datetimez
+    "E", # pycodestyle error
+    "EM", # flake8-errmsg
+    "ERA", # eradicate
+    "F", # Pyflakes
+    "FBT", # flake8-boolean-trap
+    "FLY", # flynt
+    "FURB", # refurb
+    "G", # flake80logging-format
+    "I", # isort
+    "ICN", # flake8-import-conventions
+    "INT", # flake8-gettext
+    "ISC", # flake8-implicit-str-concat
+    "LOG", # flake8-logging
+    "N", # pep8-naming
+    "NPY", # NumPy
+    "PERF", # Perflint
+    "PGH", # pygrep-hooks
+    "PIE", # flake8-pie
+    "PL", # Pylint
+    "PT", # flake8-pytest-style
+    "PTH", # flake8-use-pathlib
+    "PYI", # flake8-pyi
+    "Q", # flake8-quotes
+    "RET", # flake8-return
+    "RSE", # flake8-raise
+    "RUF", # Ruff
+    "S", # flake8-bandit
+    "SLOT", # flake8-slots
+    "T10", # flake8-debugger
+    "T20", # flake8-print
+    "TCH", # flake8-type-checking
+    "TD", # flake8-todos
+    "TID", # flake8-tidy-imports
+    "TRY", # tryceratops
+    "SIM", # flake8-simplify
+    "SLF", # flake8-self
+    "UP", # pyupgrade
+    "W", # pycodestyle warning
+    "YTT", # flake8-2020
 ]
 ignore = [
     # Conflicting lint rules with Ruff's formatter
@@ -169,7 +166,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
-"test_*.py" = ["S101"]  # Use of assert is allowed in test files
+"test_*.py" = ["S101"] # Use of assert is allowed in test files
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18

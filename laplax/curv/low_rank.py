@@ -104,7 +104,7 @@ def get_low_rank_approximation(  # noqa: PLR0913, PLR0917
 
     # Convert back to the requested output dtype if needed
     if return_dtype != calc_dtype:
-        low_rank_result = jax.tree_map(
+        low_rank_result = jax.tree.map(
             lambda x: x.astype(return_dtype), low_rank_result
         )
 

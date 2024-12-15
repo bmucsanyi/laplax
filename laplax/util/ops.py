@@ -104,7 +104,7 @@ def precompute_list(func, items, option: str | bool | None = None, **kwargs):  #
         )
 
         def get_element(index: int):
-            return jax.tree_map(operator.itemgetter(index), precomputed)
+            return jax.tree.map(operator.itemgetter(index), precomputed)
 
         return get_element
 
