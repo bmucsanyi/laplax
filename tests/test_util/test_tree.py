@@ -1,5 +1,4 @@
 import jax
-import jax.numpy as jnp
 import pytest
 import pytest_cases
 
@@ -18,7 +17,7 @@ def key(request) -> KeyType:
 
 
 @pytest_cases.case(id="vector_tree")
-def case_one_vector_tree(key: KeyType):
+def case_vector_tree(key: KeyType):
     vector = jax.random.normal(key, shape=(6,))
     return {"a": vector[:2], "b": vector[2:4], "c": vector[4:]}, vector
 
@@ -53,7 +52,7 @@ def test_sub(test_case):
     allclose(flatten(sub(tree1, tree2)), vector1 - vector2)
 
 
-# FIXME(2bys)
+# TODO(2bys): finish
 # @pytest_cases.parametrize_with_cases("test_case", cases=[case_one_vector_tree])
 # def test_invert(test_case):
 #     (tree1, vector1) = test_case
