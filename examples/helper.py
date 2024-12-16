@@ -19,7 +19,7 @@ class DataLoader:
 
     def __iter__(self):
         if self.shuffle:
-           self.rng.shuffle(self.indices)
+            self.rng.shuffle(self.indices)
         self.current_idx = 0
         return self
 

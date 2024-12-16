@@ -75,7 +75,7 @@ def laplax_dtype():
     return jnp.dtype(dtype)
 
 
-def precompute_list(func, items, option: str | bool | None = None, **kwargs):  # noqa: FBT001
+def precompute_list(func, items, option: str | bool | None = None, **kwargs):
     """Precomputes a list of operations or returns the original function.
 
     Args:
