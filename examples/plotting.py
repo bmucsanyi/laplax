@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 
 
-def plot_regression_with_uncertainty(  # noqa: PLR0913, PLR0917
+def plot_regression_with_uncertainty(
     train_input,
     train_target,
     X_grid,
@@ -13,7 +13,7 @@ def plot_regression_with_uncertainty(  # noqa: PLR0913, PLR0917
     xlabel="Input",
     ylabel="Target",
 ):
-    """Create a visually enhanced plot of training data, model predictions, and uncertainty.
+    """Plot training data, model predictions, and uncertainty.
 
     Args:
         train_input: Training inputs (e.g., X_train).
@@ -51,7 +51,7 @@ def plot_regression_with_uncertainty(  # noqa: PLR0913, PLR0917
     )
 
     # Customize plot appearance
-    ax.grid(True, linestyle="--", alpha=0.6)  # noqa: FBT003
+    ax.grid(True, linestyle="--", alpha=0.6)
     ax.set_xlabel(xlabel, fontsize=12)
     ax.set_ylabel(ylabel, fontsize=12)
     ax.set_title(title, fontsize=14, fontweight="bold")
