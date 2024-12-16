@@ -13,14 +13,14 @@ from laplax.eval.calibrate import (
     evaluate_for_given_prior_arguments,
     optimize_prior_prec,
 )
-from laplax.eval.push_forward import set_lin_pushforward
+from laplax.eval.pushforward import set_lin_pushforward
 
 from .cases.regression import case_regression
 
 
 @pytest_cases.parametrize("curv_op", ["full"])
 @pytest_cases.parametrize_with_cases("task", cases=case_regression)
-def test_lin_push_forward(curv_op, task):
+def test_lin_pushforward(curv_op, task):
     """Test for pipeline integration of calibration function."""
     model_fn = task.get_model_fn()
     params = task.get_parameters()
