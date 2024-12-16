@@ -14,7 +14,7 @@ def input_target_split(batch) -> dict[jax.Array, jax.Array]:
     return {"input": batch[0], "target": batch[1]}
 
 
-def reduce_add(res_new: Any, res_old: None | Any = None) -> Any:
+def reduce_add(res_new: Any, res_old: Any | None = None) -> Any:
     return add(res_new, res_old) if res_old else res_new
 
 
@@ -37,13 +37,13 @@ def wrap_function_with_data_loader(
             An iterable that yields batches of data to be processed.
 
         transform (Callable, optional):
-            A function to preprocess each batch before passing it to `function`. Defaults
-            to `input_target_split`, which formats batches into dictionaries with "input"
-            and "target" keys.
+            A function to preprocess each batch before passing it to `function`.
+            Defaults to `input_target_split`, which formats batches into dictionaries
+            with "input" and "target" keys.
 
         reduce (Callable, optional):
-            A function to combine results from processing individual batches. Defaults to
-            `reduce_add`, which sums results across batches.
+            A function to combine results from processing individual batches. Defaults
+            to `reduce_add`, which sums results across batches.
 
         **function_kwargs:
             Additional arguments for configuring the wrapped function. If `"jit"=True`,
