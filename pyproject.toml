@@ -195,6 +195,7 @@ ignore = [
     "D102",
     "D103",
     "D104",
+    "D105",
     # 3. Type hints are not required for now
     "ANN201",
     "ANN202",
@@ -206,7 +207,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
-"test_*.py" = ["S101"] # Use of assert is allowed in test files
+"tests/*.py" = ["S101"] # Use of assert is allowed in test files
 "*.ipynb" = ["T201"]  # Print statements are fine in notebooks
 
 [tool.ruff.lint.mccabe]
