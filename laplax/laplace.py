@@ -1,4 +1,3 @@
-# noqa: D100
 # import jax
 # from typing import Callable, Tuple
 
