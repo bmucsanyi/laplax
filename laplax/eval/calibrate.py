@@ -1,4 +1,3 @@
-# noqa: D100
 import time
 from collections.abc import Callable
 
