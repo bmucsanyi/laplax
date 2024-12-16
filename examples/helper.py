@@ -1,4 +1,4 @@
-from collections.abc import Iterator  # noqa: D100
+from collections.abc import Iterator
 
 import jax.numpy as jnp
 import numpy as np
@@ -8,21 +8,22 @@ from jax import random
 class DataLoader:
     """Simple dataloader."""
 
-    def __init__(self, X, y, batch_size, shuffle=True) -> None:  # noqa: D107, FBT002
+    def __init__(self, X, y, batch_size, *, shuffle=True) -> None:
         self.X = X
         self.y = y
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.dataset_size = X.shape[0]
         self.indices = np.arange(self.dataset_size)
+        self.rng = np.random.default_rng(seed=0)
 
-    def __iter__(self):  # noqa: ANN204, D105
+    def __iter__(self):
         if self.shuffle:
-            np.random.shuffle(self.indices)  # noqa: NPY002
+           self.rng.shuffle(self.indices)
         self.current_idx = 0
         return self
 
-    def __next__(self):  # noqa: ANN204, D105
+    def __next__(self):
         if self.current_idx >= self.dataset_size:
             raise StopIteration
 
@@ -71,7 +72,7 @@ def get_sinusoid_example(
     # def _data_loader(X, y, batch_size):
     #     dataset_size = X.shape[0]
     #     indices = np.arange(dataset_size)
-    #     np.random.shuffle(indices)  # noqa: NPY002
+    #     np.random.shuffle(indices)
     #     for start_idx in range(0, dataset_size, batch_size):
     #         batch_indices = indices[start_idx : start_idx + batch_size]
     #         yield X[batch_indices], y[batch_indices]
