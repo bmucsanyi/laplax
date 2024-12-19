@@ -25,7 +25,7 @@ from laplax.util.tree import mul
 # ---------------------------------------------------------------------
 
 
-def cross_entropy_hessian_mv(
+def _cross_entropy_hessian_mv(
     jv: PredArray, pred: PredArray, **kwargs
 ) -> Num[Array, "..."]:
     del kwargs
@@ -35,7 +35,7 @@ def cross_entropy_hessian_mv(
     return diag_jv - off_diag_jv
 
 
-def mse_hessian_mv(jv: PredArray, **kwargs) -> PredArray:
+def _mse_hessian_mv(jv: PredArray, **kwargs) -> PredArray:
     del kwargs
     return 2 * jv
 
@@ -71,10 +71,10 @@ def create_loss_hessian_mv(
             - `**kwargs`: Additional arguments, which are ignored.
     """
     if loss_fn == LossFn.CROSSENTROPY:
-        return cross_entropy_hessian_mv
+        return _cross_entropy_hessian_mv
 
     if loss_fn == LossFn.MSE:
-        return mse_hessian_mv
+        return _mse_hessian_mv
 
     if isinstance(loss_fn, Callable):
 
@@ -92,37 +92,6 @@ def create_loss_hessian_mv(
 
     msg = "Unsupported loss function provided."
     raise ValueError(msg)
-
-    # if loss_fn == LossFn.CROSSENTROPY:
-
-    #     def loss_hessian_mv(
-    #         jv: PredArray, *, pred: PredArray, **kwargs
-    #     ) -> Num[Array, "..."]:
-    #         del kwargs
-    #         prob = jax.nn.softmax(pred)
-    #         off_diag_jv = prob * (prob.reshape(1, -1) @ jv)
-    #         diag_jv = prob * jv
-    #         return diag_jv - off_diag_jv
-
-    # elif loss_fn == LossFn.MSE:
-
-    #     def loss_hessian_mv(jv: PredArray, **kwargs) -> PredArray:
-    #         del kwargs
-    #         return 2 * jv
-
-    # elif isinstance(loss_fn, Callable):
-
-    #     def loss_hessian_mv(
-    #         jv: PredArray, pred: PredArray, target: TargetArray, **kwargs
-    #     ) -> Num[Array, "..."]:
-    #         del kwargs
-
-    #         def loss_fn_local(p):
-    #             return loss_fn(p, target)
-
-    #         return hvp(loss_fn_local, pred, jv)
-
-    # return loss_hessian_mv
 
 
 # -----------------------------------------------------------------------------------
@@ -170,12 +139,18 @@ def create_ggn_mv_without_data(
     def _jvp_fn(
         params: Params, input: InputArray, vec: Params
     ) -> tuple[PredArray, PredArray]:
-        return jax.jvp(lambda p: model_fn(input, params=p), (params,), (vec,))
+        def _local_model_fn(p):
+            return model_fn(input=input, params=p)
+
+        return jax.jvp(_local_model_fn, (params,), (vec,))
 
     def _vjp_fn(
         params: Params, input: InputArray
     ) -> tuple[PredArray, Callable[[PredArray], Params]]:
-        pred, vjp_fn = jax.vjp(lambda p: model_fn(input, params=p), params)
+        def _local_model_fn(p):
+            return model_fn(input=input, params=p)
+
+        pred, vjp_fn = jax.vjp(_local_model_fn, params)
         return pred, lambda v: vjp_fn(v)[0]
 
     loss_hessian_mv = create_loss_hessian_mv(loss_fn)

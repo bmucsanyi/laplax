@@ -80,7 +80,7 @@ class RosenbrockCase:
 
     @property
     def model_fn(self):
-        return lambda params, input: rosenbrock_first(params, alpha=self.alpha)  # noqa: ARG005
+        return lambda input, params: rosenbrock_first(params, alpha=self.alpha)  # noqa: ARG005
 
     @property
     def loss_fn(self):

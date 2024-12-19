@@ -1,7 +1,5 @@
 """Full hessian estimation."""
 
-from functools import partial
-
 import jax
 
 from laplax.enums import LossFn
@@ -11,66 +9,87 @@ from laplax.types import (
     Data,
     InputArray,
     ModelFn,
+    Num,
     Params,
     PredArray,
+    PyTree,
     TargetArray,
 )
 
 
-def hvp(func: Callable, primals: Array, tangents: Array) -> Array:
+def hvp(func: Callable, primals: PyTree, tangents: PyTree) -> PyTree:
     return jax.jvp(jax.grad(func), (primals,), (tangents,))[1]
 
 
 def concatenate_model_and_loss_fn(
-    model_fn: ModelFn,
+    model_fn: ModelFn,  # type: ignore[reportRedeclaration]
     loss_fn: LossFn | Callable | None = None,
     *,
     has_batch: bool = False,
-) -> ModelFn:
+) -> Callable[[InputArray, TargetArray, Params], Num[Array, "..."]]:
     if has_batch:
-
-        def model_fn(input: InputArray, params: Params) -> PredArray:
-            return jax.vmap(model_fn, in_axes=(None, 0))(input, params)
+        model_fn = jax.vmap(model_fn, in_axes=(0, None))
 
     if loss_fn == LossFn.MSE:
-        return lambda input, target, params: jax.lax.l2_loss(
-            model_fn(input=input, params=params) - target
-        )
+
+        def loss_wrapper(
+            input: InputArray, target: TargetArray, params: Params
+        ) -> Num[Array, "..."]:
+            return (model_fn(input, params) - target) ** 2
+
+        return loss_wrapper
+
     if loss_fn == LossFn.CROSSENTROPY:
-        return lambda input, target, params: jax.lax.l1_loss(
-            model_fn(input=input, params=params) - target
-        )
-    if isinstance(loss_fn, Callable):
-        return lambda input, target, params: loss_fn(
-            model_fn(input=input, params=params), target
-        )
+
+        def loss_wrapper(
+            input: InputArray, target: TargetArray, params: Params
+        ) -> Num[Array, "..."]:
+            return jax.lax.log_sigmoid_cross_entropy(model_fn(input, params), target)
+
+        return loss_wrapper
+
+    if callable(loss_fn):
+
+        def loss_wrapper(
+            input: InputArray, target: TargetArray, params: Params
+        ) -> Num[Array, "..."]:
+            return loss_fn(model_fn(input, params), target)
+
+        return loss_wrapper
+
     msg = f"Unknown loss function: {loss_fn}."
     raise ValueError(msg)
 
 
 def create_hessian_mv_without_data(
-    model_fn: ModelFn,
+    model_fn: ModelFn,  # type: ignore[reportRedeclaration]
     params: Params,
     loss_fn: LossFn | Callable | None = None,
     *,
     has_batch: bool = False,
     **kwargs,
 ) -> Callable[[Params, Data], Params]:
-    """Hessian-vector product without hardcoded data batch."""
     del kwargs
+
+    new_model_fn: Callable[[InputArray, TargetArray, Params], Num[Array, "..."]]  # noqa: UP037
+
     if loss_fn is not None:
-        model_fn = concatenate_model_and_loss_fn(model_fn, loss_fn, has_batch=has_batch)
+        new_model_fn = concatenate_model_and_loss_fn(
+            model_fn, loss_fn, has_batch=has_batch
+        )
     else:
 
-        def model_fn(
+        def model_without_loss(
             input: InputArray, target: TargetArray, params: Params
         ) -> PredArray:
-            del target
+            del target  # Ignore target since there's no loss
             return model_fn(input, params)
+
+        new_model_fn = model_without_loss
 
     def _hessian_mv(vector: Params, data: Data) -> Params:
         return hvp(
-            lambda p: model_fn(input=data["input"], target=data["target"], params=p),
+            lambda p: new_model_fn(data["input"], data["target"], p),
             params,
             vector,
         )
@@ -79,11 +98,11 @@ def create_hessian_mv_without_data(
 
 
 def create_hessian_mv(
-    model_fn: ModelFn,
+    model_fn: ModelFn,  # type: ignore[reportRedeclaration]
     params: Params,
     data: Data,
     loss_fn: LossFn | Callable | None = None,
     **kwargs,
 ) -> Callable[[Params], Params]:
     hessian_mv = create_hessian_mv_without_data(model_fn, params, loss_fn, **kwargs)
-    return partial(hessian_mv, data=data)
+    return lambda vector: hessian_mv(vector, data)

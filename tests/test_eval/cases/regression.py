@@ -75,7 +75,7 @@ class LinenRegressionTask(BaseRegressionTask):
         self.params = self.model.init(rng_key, data["input"])
 
     def get_model_fn(self):
-        def model_fn(params, input):
+        def model_fn(input, params):
             return self.model.apply(params, input)
 
         return model_fn
@@ -106,12 +106,11 @@ class NNXRegressionTask(BaseRegressionTask):
             out_channels=self.out_channels,
         )
 
-        _, self.params, self.rest = nnx.split(self.model, nnx.Param, ...)
+        self.graph_def, self.params = nnx.split(self.model)
 
     def get_model_fn(self):
-        def model_fn(params, input):
-            nnx.update(self.model, nnx.GraphState.merge(params, self.rest))
-            return self.model(input)
+        def model_fn(input, params):
+            return nnx.call((self.graph_def, params))(input)[0]
 
         return model_fn
 
@@ -148,7 +147,7 @@ class EquinoxRegressionTask(BaseRegressionTask):
         self.params, self.static = eqx.partition(self.model, eqx.is_array)
 
     def get_model_fn(self):
-        def model_fn(params, input):
+        def model_fn(input, params):
             new_model = eqx.combine(params, self.static)
             return new_model(input)
 
