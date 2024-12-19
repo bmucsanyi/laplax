@@ -1,5 +1,4 @@
 import math
-from collections import OrderedDict
 
 import jax
 import jax.numpy as jnp
@@ -185,8 +184,8 @@ def nll_gaussian(
     return nll
 
 
-DEFAULT_REGRESSION_METRICS = OrderedDict([
-    ("rmse", estimate_rmse),
-    ("q", estimate_q),
-    ("nll", nll_gaussian),
-])
+DEFAULT_REGRESSION_METRICS = {
+    "rmse": estimate_rmse,
+    "q": estimate_q,
+    "nll": nll_gaussian,
+}

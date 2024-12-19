@@ -5,7 +5,6 @@ weight space uncertainty onto output uncertainty.
 """
 
 import math
-from collections import OrderedDict
 
 import jax
 import jax.numpy as jnp
@@ -111,14 +110,14 @@ def mc_samples_fn(pred_ensemble: PredArray, n_samples: int = 5, **kwargs):
     return util.tree.tree_slice(pred_ensemble, 0, n_samples)
 
 
-DEFAULT_MC_FUNCTIONS = OrderedDict([
-    ("pred", pred_fn),
-    ("pred_mean", mc_pred_mean_fn),
-    ("pred_var", mc_pred_var_fn),
-    ("pred_std", mc_pred_std_fn),
-    ("pred_cov", mc_pred_cov_fn),
-    ("samples", mc_samples_fn),
-])
+DEFAULT_MC_FUNCTIONS = {
+    "pred": pred_fn,
+    "pred_mean": mc_pred_mean_fn,
+    "pred_var": mc_pred_var_fn,
+    "pred_std": mc_pred_std_fn,
+    "pred_cov": mc_pred_cov_fn,
+    "samples": mc_samples_fn,
+}
 
 
 def set_mc_pushforward(
@@ -128,7 +127,7 @@ def set_mc_pushforward(
     posterior: Callable[[PriorArguments], Posterior],
     prior_arguments: PriorArguments,
     n_weight_samples: int,
-    pushforward_functions: OrderedDict = DEFAULT_MC_FUNCTIONS,
+    pushforward_functions: dict = DEFAULT_MC_FUNCTIONS,
     **kwargs,
 ) -> Callable[[InputArray], dict[str, Array]]:
     # Create weight sample function
@@ -204,14 +203,14 @@ def lin_n_samples_fn(
     )
 
 
-DEFAULT_LIN_FINALIZE = OrderedDict([
-    ("pred", pred_fn),
-    ("pred_mean", pred_fn),
-    ("pred_var", lin_pred_var_fn),
-    ("pred_std", lin_pred_std_fn),
-    ("pred_cov", lin_pred_cov_fn),
-    ("samples", lin_n_samples_fn),
-])
+DEFAULT_LIN_FINALIZE = {
+    "pred": pred_fn,
+    "pred_mean": pred_fn,
+    "pred_var": lin_pred_var_fn,
+    "pred_std": lin_pred_std_fn,
+    "pred_cov": lin_pred_cov_fn,
+    "samples": lin_n_samples_fn,
+}
 
 
 def set_output_cov_mv(
@@ -238,7 +237,7 @@ def set_lin_pushforward(
     mean: Params,
     posterior: Callable[..., PosteriorState],
     prior_arguments: PriorArguments,
-    pushforward_functions: OrderedDict = DEFAULT_LIN_FINALIZE,
+    pushforward_functions: dict = DEFAULT_LIN_FINALIZE,
     **kwargs,
 ) -> Callable:
     # Create posterior state

@@ -1,16 +1,14 @@
-from collections import OrderedDict
-
 from laplax.types import Array, Callable, Data, InputArray
 from laplax.util.ops import lmap
 from laplax.util.utils import identity
 
 
 def finalize_functions(
-    functions: OrderedDict[str, Callable], results: dict[str, Array], **kwargs
+    functions: dict[str, Callable], results: dict[str, Array], **kwargs
 ):
     """Finalize functions.
 
-    Scans over ordered dictionary of functions (metrics, pushforwards, ...) and fills
+    Scans over dictionary of functions (metrics, pushforwards, ...) and fills
     in the results dictionary. Relevant function values are passed as kwargs.
     """
     for name, func in functions.items():
@@ -43,7 +41,7 @@ def evaluate_metrics_on_dataset(
     pred_fn: Callable[[InputArray], dict[str, Array]],
     data: Data,
     *,
-    metrics: OrderedDict[str, Callable],
+    metrics: dict[str, Callable],
     apply: Callable = identity,
     **kwargs,
 ) -> dict:
