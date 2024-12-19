@@ -58,6 +58,7 @@ of JAX-accelerated numerical routines where possible.
 
 import jax
 import jax.numpy as jnp
+from jax.experimental.sparse import linalg
 from jax.experimental.sparse.linalg import (
     _check_inputs,  # noqa: PLC2701
     _eigh_ascending,  # noqa: PLC2701
@@ -90,7 +91,7 @@ def lobpcg_standard(
             `jax.experimental.sparse.linalg.lobpcg_standard`.
     """
     if A_jittable:
-        return jax.experimental.sparse.linalg.lobpcg_standard(A, X, m, tol)
+        return linalg.lobpcg_standard(A, X, m, tol)
 
     n, k = X.shape
     _check_inputs(A, X)

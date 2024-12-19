@@ -17,7 +17,7 @@ import jax
 import jax.numpy as jnp
 
 from laplax.curv.lanczos import lobpcg_standard
-from laplax.types import Array, Callable, DType, KeyType, Num
+from laplax.types import Array, Callable, DType, Float, KeyType, Num
 from laplax.util.flatten import wrap_function
 
 # -----------------------------------------------------------------------------
@@ -37,7 +37,7 @@ class LowRankTerms:
 
     U: Num[Array, "P R"]  # noqa: F722
     S: Num[Array, "R"]  # noqa: F821
-    scalar: float
+    scalar: Float[Array, ""]  # noqa: F722
 
 
 jax.tree_util.register_pytree_node(
@@ -136,7 +136,7 @@ def get_low_rank_approximation(
     low_rank_result = LowRankTerms(
         U=jnp.asarray(eigenvecs, dtype=return_dtype),
         S=jnp.asarray(eigenvals, dtype=return_dtype),
-        scalar=0.0,
+        scalar=jnp.asarray(0.0, dtype=return_dtype),
     )
 
     # Restore the original configuration dtype

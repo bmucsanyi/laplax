@@ -217,30 +217,30 @@ def low_rank_state_to_cov(
 # General api
 # ---------------------------------------------------------------------------------
 
-CURVATURE_METHODS = {
+CURVATURE_METHODS: dict[CurvApprox | str, Callable] = {
     CurvApprox.FULL: create_full_curvature,
     CurvApprox.DIAGONAL: create_diagonal_curvature,
     CurvApprox.LOW_RANK: create_low_rank_curvature,
 }
 
-CURVATURE_PRIOR_METHODS = {
+CURVATURE_PRIOR_METHODS: dict[CurvApprox | str, Callable] = {
     CurvApprox.FULL: full_with_prior,
     CurvApprox.DIAGONAL: diag_with_prior,
     CurvApprox.LOW_RANK: low_rank_with_prior,
 }
-CURVATURE_TO_POSTERIOR_STATE = {
+CURVATURE_TO_POSTERIOR_STATE: dict[CurvApprox | str, Callable] = {
     CurvApprox.FULL: full_prec_to_state,
     CurvApprox.DIAGONAL: diag_prec_to_state,
     CurvApprox.LOW_RANK: low_rank_prec_to_state,
 }
 
-CURVATURE_STATE_TO_SCALE = {
+CURVATURE_STATE_TO_SCALE: dict[CurvApprox | str, Callable] = {
     CurvApprox.FULL: full_state_to_scale,
     CurvApprox.DIAGONAL: diag_state_to_scale,
     CurvApprox.LOW_RANK: low_rank_state_to_scale,
 }
 
-CURVATURE_STATE_TO_COV = {
+CURVATURE_STATE_TO_COV: dict[CurvApprox | str, Callable] = {
     CurvApprox.FULL: full_state_to_cov,
     CurvApprox.DIAGONAL: diag_state_to_cov,
     CurvApprox.LOW_RANK: low_rank_state_to_cov,
@@ -380,10 +380,10 @@ def register_curvature_method(
         )
         raise ValueError(msg)
 
-    CURVATURE_METHODS[name] = create_fn or CURVATURE_METHODS[default]
-    CURVATURE_PRIOR_METHODS[name] = prior_fn or CURVATURE_PRIOR_METHODS[default]
+    CURVATURE_METHODS[name] = create_fn or CURVATURE_METHODS[default]  # type: ignore[reportArgumentType]
+    CURVATURE_PRIOR_METHODS[name] = prior_fn or CURVATURE_PRIOR_METHODS[default]  # type: ignore[reportArgumentType]
     CURVATURE_TO_POSTERIOR_STATE[name] = (
-        posterior_fn or CURVATURE_TO_POSTERIOR_STATE[default]
+        posterior_fn or CURVATURE_TO_POSTERIOR_STATE[default]  # type: ignore[reportArgumentType]
     )
-    CURVATURE_STATE_TO_SCALE[name] = scale_fn or CURVATURE_STATE_TO_SCALE[default]
-    CURVATURE_STATE_TO_COV[name] = cov_fn or CURVATURE_STATE_TO_COV[default]
+    CURVATURE_STATE_TO_SCALE[name] = scale_fn or CURVATURE_STATE_TO_SCALE[default]  # type: ignore[reportArgumentType]
+    CURVATURE_STATE_TO_COV[name] = cov_fn or CURVATURE_STATE_TO_COV[default]  # type: ignore[reportArgumentType]
