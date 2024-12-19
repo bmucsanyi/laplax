@@ -48,12 +48,10 @@ class BaseClassificationTask:
         self._initialize()
 
     def _initialize(self):
-        msg = "This method must be implemented by subclasses."
-        raise NotImplementedError(msg)
+        raise NotImplementedError
 
     def get_model_fn(self) -> Callable:
-        msg = "This method must be implemented by subclasses."
-        raise NotImplementedError(msg)
+        raise NotImplementedError
 
     def get_parameters(self) -> Any:
         return self.params
@@ -61,7 +59,7 @@ class BaseClassificationTask:
     def get_data_batch(self, batch_size: int) -> dict:
         key = jax.random.key(self.seed)
         return generate_data(
-            key, (batch_size,) + self.in_channels, (batch_size, self.out_channels)
+            key, (batch_size, *self.in_channels), (batch_size, self.out_channels)
         )
 
 
@@ -108,11 +106,10 @@ class LinenClassificationTask(BaseClassificationTask):
 
                 if not batch_dim:
                     return jnp.squeeze(x)
-                else:
-                    return x
+                return x
 
         rng_key = jax.random.PRNGKey(self.seed)
-        data = generate_data(rng_key, (1,) + self.in_channels, (1, self.out_channels))
+        data = generate_data(rng_key, (1, *self.in_channels), (1, self.out_channels))
         self.model = CNN(
             in_channels=self.in_channels,
             out_channels=self.out_channels,
@@ -172,8 +169,7 @@ class NNXClassificationTask(BaseClassificationTask):
 
                 if not batch_dim:
                     return jnp.squeeze(x)
-                else:
-                    return x
+                return x
 
         rngs = nnx.Rngs(self.seed)
 
@@ -302,7 +298,7 @@ def create_task(
         ((11, 5, 3), 2, 3, 2, 2, 20, 2),
     ],
 )
-def case_classification(  # noqa: PLR0913, PLR0917
+def case_classification(
     task_class,
     in_channels: tuple,
     conv_features: int,

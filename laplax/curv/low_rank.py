@@ -10,6 +10,8 @@ customizable data types, tolerance levels, and the ability to disable JIT
 compilation when required.
 """
 
+import warnings
+
 import jax
 import jax.numpy as jnp
 
@@ -18,7 +20,7 @@ from laplax.types import Callable, DType, KeyType
 from laplax.util.flatten import wrap_function
 
 
-def get_low_rank_approximation(  # noqa: PLR0913, PLR0917
+def get_low_rank_approximation(
     mv: Callable[[jax.Array], jax.Array],
     key: KeyType,
     size: int,
@@ -27,7 +29,8 @@ def get_low_rank_approximation(  # noqa: PLR0913, PLR0917
     calc_dtype: DType = jnp.float64,
     return_dtype: DType = jnp.float32,
     tol: float | None = None,
-    mv_jittable: bool = True,  # noqa: FBT001, FBT002
+    *,
+    mv_jittable: bool = True,
     **kwargs,
 ) -> dict:
     """Computes a low-rank approximation using the LOBPCG algorithm.
@@ -68,11 +71,12 @@ def get_low_rank_approximation(  # noqa: PLR0913, PLR0917
     # Adjust maxiter if it's too large compared to problem size
     if size < maxiter * 5:
         maxiter = max(1, size // 5 - 1)
-        print(f"Warning: Reduced maxiter to {maxiter} due to insufficient size.")  # noqa: T201
+        msg = f"Reduced maxiter to {maxiter} due to insufficient size."
+        warnings.warn(msg, stacklevel=1)
 
     is_compute_in_float64 = jax.config.read("jax_enable_x64")
     if jnp.float64 in {mv_dtype, calc_dtype, return_dtype}:
-        jax.config.update("jax_enable_x64", True)  # noqa: FBT003
+        jax.config.update("jax_enable_x64", True)
 
     # Wrap to_dtype around mv if necessary.
     if mv_dtype != calc_dtype:
@@ -104,7 +108,7 @@ def get_low_rank_approximation(  # noqa: PLR0913, PLR0917
 
     # Convert back to the requested output dtype if needed
     if return_dtype != calc_dtype:
-        low_rank_result = jax.tree_map(
+        low_rank_result = jax.tree.map(
             lambda x: x.astype(return_dtype), low_rank_result
         )
 

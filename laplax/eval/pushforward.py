@@ -105,7 +105,7 @@ DEFAULT_MC_FUNCTIONS = OrderedDict([
 ])
 
 
-def set_mc_pushforward(  # noqa: PLR0913, PLR0917
+def set_mc_pushforward(
     key: KeyType,
     model_fn: Callable,
     mean: PyTree,
@@ -155,19 +155,19 @@ def set_mc_pushforward(  # noqa: PLR0913, PLR0917
 
 def lin_pred_var_fn(**kwargs):
     # Get arguments
-    _cov = kwargs.get("pred_cov", kwargs.get("cov_mv"))  # Covariance
+    cov = kwargs.get("pred_cov", kwargs.get("cov_mv"))  # Covariance
     pred = kwargs.get("pred")
 
     # Compute diagonal as variance
-    _var = util.mv.diagonal(
-        _cov, layout=math.prod(pred.shape)
+    var = util.mv.diagonal(
+        cov, layout=math.prod(pred.shape)
     )  # This assumes output is not a tree.
-    return _var
+    return var
 
 
 def lin_pred_std_fn(**kwargs):
-    _var = kwargs.get("pred_var", lin_pred_var_fn(**kwargs))
-    return util.tree.sqrt(_var)
+    var = kwargs.get("pred_var", lin_pred_var_fn(**kwargs))
+    return util.tree.sqrt(var)
 
 
 def lin_pred_cov_fn(**kwargs):
@@ -216,7 +216,7 @@ def set_output_cov_mv(posterior_state, input, jvp, vjp):
     return {"cov_mv": output_cov_mv, "scale_mv": output_cov_scale_mv}
 
 
-def set_lin_pushforward(  # noqa: PLR0913, PLR0917
+def set_lin_pushforward(
     key: KeyType,
     model_fn: Callable,
     mean: PyTree,

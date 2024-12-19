@@ -47,12 +47,12 @@ def invalid_prec():
 def test_prec_to_scale(prior_prec):
     """Test `prec_to_scale` for valid input."""
     scale = prec_to_scale(prior_prec)
-    assert (
-        scale.shape == prior_prec.shape
-    ), "Scale matrix shape should match precision matrix shape."
-    assert jnp.all(
-        jnp.linalg.eigvals(scale) > 0
-    ), "Scale matrix should be positive definite."
+    assert scale.shape == prior_prec.shape, (
+        "Scale matrix shape should match precision matrix shape."
+    )
+    assert jnp.all(jnp.linalg.eigvals(scale) > 0), (
+        "Scale matrix should be positive definite."
+    )
     assert jnp.allclose(
         scale @ scale.T @ prior_prec, jnp.eye(prior_prec.shape[0]), atol=1e-6, rtol=1e-6
     )
@@ -127,7 +127,7 @@ def test_posterior_covariance_est(task):
         ),
     ],
 )
-def test_register_curvature_method(  # noqa: PLR0913, PLR0917
+def test_register_curvature_method(
     name, create_fn, prior_fn, posterior_fn, scale_fn, cov_fn, default
 ):
     register_curvature_method(

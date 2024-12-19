@@ -67,14 +67,15 @@ from jax.experimental.sparse.linalg import (
 from laplax.types import Callable, DType
 
 
-def lobpcg_standard(  # noqa: PLR0913, PLR0917
+def lobpcg_standard(
     A: Callable[[jax.Array], jax.Array],
     X: jax.Array,
     m: int = 100,
     tol: jax.Array | float | None = None,
     calc_dtype: DType = jnp.float64,  # dtype for internal calculations
     a_dtype: DType = jnp.float32,  # dtype for A calls
-    A_jittable: bool = True,  # noqa: FBT001, FBT002
+    *,
+    A_jittable: bool = True,
 ):
     """Compute top-k eigenvalues using LOBPCG with mixed precision.
 
@@ -134,7 +135,7 @@ def lobpcg_standard(  # noqa: PLR0913, PLR0917
         return X, P, R, theta
 
     @jax.jit
-    def iteration_second_step(X, R, theta, AX, n, tol):  # noqa: PLR0913, PLR0917
+    def iteration_second_step(X, R, theta, AX, n, tol):
         # # Compute new residuals.
         # AX = A(X)
         R = AX - theta[jnp.newaxis, :k] * X

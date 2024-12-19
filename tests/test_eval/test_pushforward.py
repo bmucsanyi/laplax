@@ -1,4 +1,4 @@
-"""Tests for `laplax.eval.push_forward`."""
+"""Tests for `laplax.eval.pushforward`."""
 
 import jax
 import jax.numpy as jnp
@@ -6,9 +6,8 @@ import pytest_cases
 
 from laplax.curv.cov import create_posterior_function
 from laplax.curv.ggn import create_ggn_mv
-from laplax.eval.push_forward import set_lin_pushforward, set_mc_pushforward
+from laplax.eval.pushforward import set_lin_pushforward, set_mc_pushforward
 
-from .cases.classification import case_classification
 from .cases.regression import case_regression
 
 DEFAULT_CASE_LIST = [case_regression]
@@ -21,7 +20,7 @@ DEFAULT_CASE_LIST = [case_regression]
     ["full", "diagonal", "low_rank"],
 )
 @pytest_cases.parametrize_with_cases("task", cases=DEFAULT_CASE_LIST)
-def test_mc_push_forward(curv_op, task):
+def test_mc_pushforward(curv_op, task):
     model_fn = task.get_model_fn()
     params = task.get_parameters()
     data = task.get_data_batch(batch_size=20)
@@ -62,7 +61,7 @@ def test_mc_push_forward(curv_op, task):
     ["full", "diagonal", "low_rank"],
 )
 @pytest_cases.parametrize_with_cases("task", cases=DEFAULT_CASE_LIST)
-def test_lin_push_forward(curv_op, task):
+def test_lin_pushforward(curv_op, task):
     model_fn = task.get_model_fn()
     params = task.get_parameters()
     data = task.get_data_batch(batch_size=20)

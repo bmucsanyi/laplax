@@ -164,7 +164,7 @@ def wrap_function(
     output_fn: Callable | None = None,
     argnums: int = 0,
 ) -> Callable:
-    def wrapper(*args, **kwargs):  # noqa: ANN002
+    def wrapper(*args, **kwargs):
         # Use the identity function if input_fn or output_fn is None
         effective_input_fn = input_fn or identity
         effective_output_fn = output_fn or identity
@@ -188,7 +188,7 @@ def wrap_factory(
     input_fn: Callable | None = None,
     output_fn: Callable | None = None,
 ) -> any:
-    def wrapped_factory(*args, **kwargs) -> Callable:  # noqa: ANN002
+    def wrapped_factory(*args, **kwargs) -> Callable:
         fn = factory(*args, **kwargs)
         return wrap_function(fn, input_fn, output_fn)
 
@@ -198,7 +198,7 @@ def wrap_factory(
 def inflate_and_flatten(flatten_fn: Callable, inflate_fn: Callable, argnums: int = 0):
     def decorator(func):
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):  # noqa: ANN002
+        def wrapper(*args, **kwargs):
             # Flatten the input to get the tree definition and shapes
             args[argnums] = inflate_fn(args[argnums])
 

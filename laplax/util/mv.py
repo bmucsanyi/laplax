@@ -111,4 +111,4 @@ def todensetree(mv: Callable, layout: PyTree, **kwargs) -> PyTree:
     mv_out = lmap(mv, identity, batch_size=kwargs.get("lmap_dense_tree", "mv"))
 
     # Convert the output into PyTree form
-    return jax.tree_map(partial(unravel_array_into_pytree, layout, 0), mv_out)
+    return jax.tree.map(partial(unravel_array_into_pytree, layout, 0), mv_out)

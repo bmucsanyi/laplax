@@ -2,6 +2,7 @@
 local_*
 .ruff_cache
 .idea
+.vscode
 
 # Extensions
 *.ipynb

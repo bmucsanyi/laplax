@@ -1,4 +1,3 @@
-# noqa: D100
 import math
 from collections import OrderedDict
 
@@ -138,11 +137,12 @@ def estimate_true_rmse(pred: jax.Array, target: jax.Array, **kwargs) -> float:
     return jnp.sqrt(jnp.mean(jnp.power(pred - target, 2)))
 
 
-def nll_gaussian(  # noqa: D417
+def nll_gaussian(
     pred: jnp.ndarray,
     pred_std: jnp.ndarray,
     target: jnp.ndarray,
-    scaled: bool = True,  # noqa: FBT001, FBT002
+    *,
+    scaled: bool = True,
     **kwargs,
 ) -> float:
     """Negative log likelihood for a Gaussian distribution in JAX.
@@ -157,6 +157,7 @@ def nll_gaussian(  # noqa: D417
         target: 1D array of the true labels in the held out dataset.
         scaled: Whether to scale the negative log likelihood by the size
             of the held out set.
+        kwargs: Additional keyword arguments.
 
     Returns:
         The negative log likelihood for the held out set.
@@ -166,9 +167,9 @@ def nll_gaussian(  # noqa: D417
     del kwargs
 
     # Ensure input arrays are 1D and of the same shape
-    assert (  # noqa: S101
-        pred.shape == pred_std.shape == target.shape
-    ), "Arrays must have the same shape."
+    if not (pred.shape == pred_std.shape == target.shape):
+        msg = "Arrays must have the same shape"
+        raise ValueError(msg)
 
     # Compute residuals
     residuals = pred - target
