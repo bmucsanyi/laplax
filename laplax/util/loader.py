@@ -5,9 +5,21 @@ import operator
 import jax
 import jax.numpy as jnp
 
-from laplax.types import Any, Callable, Iterable
+from laplax.types import Any, Array, Callable, Data, Iterable, PyTree
 from laplax.util.tree import add
-from laplax.util.util import input_target_split
+
+# ------------------------------------------------------------------------
+#  Data transformations
+# ------------------------------------------------------------------------
+
+
+def input_target_split(batch: tuple[Array, Array]) -> Data:
+    return {"input": batch[0], "target": batch[1]}
+
+
+# ------------------------------------------------------------------------
+#  Reduction functions
+# ------------------------------------------------------------------------
 
 
 def reduce_add(
@@ -21,7 +33,7 @@ def reduce_add(
     return new_state, new_state
 
 
-def concat(tree1, tree2, axis=0):
+def concat(tree1: PyTree, tree2: PyTree, axis: int = 0) -> PyTree:
     return jax.tree.map(
         lambda x, y: jax.numpy.concatenate([x, y], axis=axis), tree1, tree2
     )
@@ -60,6 +72,11 @@ def reduce_online_mean(res_new: Any, state: None | tuple = None) -> tuple[Any, t
     return current_mean, (total_count, new_sum)
 
 
+# ------------------------------------------------------------------------
+#  Core batch processing logic
+# ------------------------------------------------------------------------
+
+
 def process_batches(
     function: Callable,
     data_loader: Iterable,
@@ -70,10 +87,19 @@ def process_batches(
 ) -> Any:
     """Core batch processing logic shared between wrapper implementations."""
     state = None
+    result = None
     for batch in data_loader:
         result = function(*args, data=transform(batch), **kwargs)
         result, state = reduce(result, state)
+    if result is None:
+        msg = "Data loader was empty"
+        raise ValueError(msg)
     return result
+
+
+# ------------------------------------------------------------------------
+#  Wrapper functions
+# ------------------------------------------------------------------------
 
 
 def execute_with_data_loader(
@@ -81,6 +107,7 @@ def execute_with_data_loader(
     data_loader: Iterable,
     transform: Callable = input_target_split,
     reduce: Callable = reduce_online_mean,
+    *,
     jit: bool = False,
     **kwargs,
 ) -> Any:
@@ -94,6 +121,7 @@ def wrap_function_with_data_loader(
     data_loader: Iterable,
     transform: Callable = input_target_split,
     reduce: Callable = reduce_online_mean,
+    *,
     jit: bool = False,
 ) -> Callable:
     """Returns a function that processes batches."""

@@ -25,12 +25,12 @@ def sum_function(data, param):
     return data + param * jnp.ones_like(data)
 
 
-@pytest.fixture
+@pytest.fixture()
 def seed():
     return 0
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_iterable(seed):
     """Create sample data: list of arrays."""
     shapes = [(5, 4, 2), (5, 4, 2), (5, 4, 2), (2, 4, 2)]
@@ -38,7 +38,7 @@ def sample_iterable(seed):
     return list(starmap(jax.random.normal, zip(keys, shapes, strict=True)))
 
 
-@pytest.fixture
+@pytest.fixture()
 def full_data(sample_iterable):
     """Create concatenated version of the sample data."""
     return jnp.concatenate(sample_iterable, axis=0)
@@ -46,7 +46,7 @@ def full_data(sample_iterable):
 
 @pytest.mark.parametrize("param", [2.7])
 @pytest.mark.parametrize(
-    "reduce_fn,expected_transform",
+    ("reduce_fn", "expected_transform"),
     [
         (reduce_add, lambda x, p: jnp.sum(sum_function(x, p), axis=0, keepdims=True)),
         (reduce_concat, sum_function),
@@ -74,4 +74,5 @@ def test_reduce_functions_with_wrap_function(
         reduce=reduce_fn,
         param=param,
     )
+
     np.testing.assert_allclose(result_execute, expected, rtol=1e-6, atol=5e-6)

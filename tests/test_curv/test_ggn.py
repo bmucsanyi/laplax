@@ -7,7 +7,7 @@ import pytest
 import pytest_cases
 
 from laplax.curv.ggn import create_ggn_mv, create_loss_hessian_mv
-from laplax.types import LossFn
+from laplax.enums import LossFn
 from laplax.util.ops import lmap
 
 from .cases.rosenbrock import RosenbrockCase

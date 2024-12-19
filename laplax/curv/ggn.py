@@ -1,13 +1,22 @@
 """Generalized Gauss-Newton matrix-vector product and loss hessian."""
 
 from collections.abc import Callable
-from functools import partial
 
 import jax
 
 from laplax.curv.hessian import hvp
 from laplax.enums import LossFn
-from laplax.types import Array, Data, ModelFn, Num, Params
+from laplax.types import (
+    Array,
+    Data,
+    Float,
+    InputArray,
+    ModelFn,
+    Num,
+    Params,
+    PredArray,
+    TargetArray,
+)
 from laplax.util.ops import lmap
 from laplax.util.tree import mul
 
@@ -16,9 +25,23 @@ from laplax.util.tree import mul
 # ---------------------------------------------------------------------
 
 
+def cross_entropy_hessian_mv(
+    jv: PredArray, pred: PredArray, **kwargs
+) -> Num[Array, "..."]:
+    del kwargs
+    prob = jax.nn.softmax(pred)
+    off_diag_jv = prob * (prob.reshape(1, -1) @ jv)
+    diag_jv = prob * jv
+    return diag_jv - off_diag_jv
+
+
+def mse_hessian_mv(jv: PredArray, **kwargs) -> PredArray:
+    del kwargs
+    return 2 * jv
+
+
 def create_loss_hessian_mv(
-    loss_fn: LossFn
-    | Callable[[Num[Array, "..."], Num[Array, "..."]], Num[Array, "..."]],
+    loss_fn: LossFn | Callable[[PredArray, TargetArray], Num[Array, "..."]],
 ) -> Callable:
     """Return the Hessian-vector product for a given loss function.
 
@@ -47,24 +70,17 @@ def create_loss_hessian_mv(
                 loss functions).
             - `**kwargs`: Additional arguments, which are ignored.
     """
-    if loss_fn == "cross_entropy":
+    if loss_fn == LossFn.CROSSENTROPY:
+        return cross_entropy_hessian_mv
 
-        def loss_hessian_mv(jv, *, pred, **kwargs):
-            del kwargs
-            prob = jax.nn.softmax(pred)
-            off_diag_jv = prob * (prob.reshape(1, -1) @ jv)
-            diag_jv = prob * jv
-            return diag_jv - off_diag_jv
+    if loss_fn == LossFn.MSE:
+        return mse_hessian_mv
 
-    elif loss_fn in {"regression", "mse"}:
+    if isinstance(loss_fn, Callable):
 
-        def loss_hessian_mv(jv, **kwargs):
-            del kwargs
-            return 2 * jv
-
-    elif isinstance(loss_fn, Callable):
-
-        def loss_hessian_mv(jv, pred, target, **kwargs):
+        def custom_hessian_mv(
+            jv: PredArray, pred: PredArray, target: TargetArray, **kwargs
+        ) -> Num[Array, "..."]:
             del kwargs
 
             def loss_fn_local(p):
@@ -72,7 +88,41 @@ def create_loss_hessian_mv(
 
             return hvp(loss_fn_local, pred, jv)
 
-    return loss_hessian_mv
+        return custom_hessian_mv
+
+    msg = "Unsupported loss function provided."
+    raise ValueError(msg)
+
+    # if loss_fn == LossFn.CROSSENTROPY:
+
+    #     def loss_hessian_mv(
+    #         jv: PredArray, *, pred: PredArray, **kwargs
+    #     ) -> Num[Array, "..."]:
+    #         del kwargs
+    #         prob = jax.nn.softmax(pred)
+    #         off_diag_jv = prob * (prob.reshape(1, -1) @ jv)
+    #         diag_jv = prob * jv
+    #         return diag_jv - off_diag_jv
+
+    # elif loss_fn == LossFn.MSE:
+
+    #     def loss_hessian_mv(jv: PredArray, **kwargs) -> PredArray:
+    #         del kwargs
+    #         return 2 * jv
+
+    # elif isinstance(loss_fn, Callable):
+
+    #     def loss_hessian_mv(
+    #         jv: PredArray, pred: PredArray, target: TargetArray, **kwargs
+    #     ) -> Num[Array, "..."]:
+    #         del kwargs
+
+    #         def loss_fn_local(p):
+    #             return loss_fn(p, target)
+
+    #         return hvp(loss_fn_local, pred, jv)
+
+    # return loss_hessian_mv
 
 
 # -----------------------------------------------------------------------------------
@@ -84,7 +134,7 @@ def create_ggn_mv_without_data(
     model_fn: ModelFn,
     params: Params,
     loss_fn: LossFn | Callable,
-    factor: float = 1.0,
+    factor: Float = 1.0,
     **kwargs,
 ) -> Callable[[Params, Data], Params]:
     """GGN-mv function without hardcoded data batch.
@@ -106,6 +156,8 @@ def create_ggn_mv_without_data(
             Loss function to be used. Can be a string (e.g., "regression",
             "cross_entropy") or
             a callable that computes the loss.
+        factor (float):
+            Factor to scale the GGN-mv by.
         **kwargs:
             - lmap_ggn_mv (int, optional): Chunk size for iterating over the data.
 
@@ -116,24 +168,23 @@ def create_ggn_mv_without_data(
     """
 
     def _jvp_fn(
-        params: Params, input: Num[Array, "..."], vec: Params
-    ) -> Num[Array, "..."]:
-        return jax.jvp(lambda p: model_fn(params=p, input=input), (params,), (vec,))
+        params: Params, input: InputArray, vec: Params
+    ) -> tuple[PredArray, PredArray]:
+        return jax.jvp(lambda p: model_fn(input, params=p), (params,), (vec,))
 
     def _vjp_fn(
-        params: Params, input: Num[Array, "..."]
-    ) -> Callable[[Num[Array, "..."]], Params]:
-        return jax.vjp(lambda p: model_fn(params=p, input=input), params)
+        params: Params, input: InputArray
+    ) -> tuple[PredArray, Callable[[PredArray], Params]]:
+        pred, vjp_fn = jax.vjp(lambda p: model_fn(input, params=p), params)
+        return pred, lambda v: vjp_fn(v)[0]
 
     loss_hessian_mv = create_loss_hessian_mv(loss_fn)
 
-    def _mv_ggn_ptw(
-        input: Num[Array, "..."], target: Num[Array, "..."], vec: Params
-    ) -> Params:
+    def _mv_ggn_ptw(input: InputArray, target: TargetArray, vec: Params) -> Params:
         """Calculate JT_p H_L J_p v for a single data point."""
         pred, jv = _jvp_fn(params, input, vec)
         hjv = loss_hessian_mv(jv, pred=pred, target=target)
-        gv = _vjp_fn(params, input)[1](hjv)[0]
+        gv = _vjp_fn(params, input)[1](hjv)
         return gv
 
     def mv_ggn(vec: Params, data: Data) -> Params:
@@ -165,6 +216,7 @@ def create_ggn_mv(
     params: Params,
     data: Data,
     loss_fn: LossFn | Callable,
+    factor: Float = 1.0,
     **kwargs,
 ) -> Callable[[Params], Params]:
     """GGN-mv factory function with hardcoded data batch.
@@ -183,6 +235,8 @@ def create_ggn_mv(
         loss_fn (str | Callable):
             Loss function to be used. Can be a string (e.g., "regression",
             "cross_entropy") or a callable that computes the loss.
+        factor (float):
+            Factor to scale the GGN-mv by.
         **kwargs:
             - lmap_ggn_mv (int, optional): Chunk size for iterating over the data.
 
@@ -193,6 +247,10 @@ def create_ggn_mv(
             and dataset.
     """
     ggn_mv = create_ggn_mv_without_data(
-        model_fn=model_fn, params=params, loss_fn=loss_fn, **kwargs
+        model_fn=model_fn, params=params, loss_fn=loss_fn, factor=factor, **kwargs
     )
-    return partial(ggn_mv, data=data)
+
+    def wrapped_ggn_mv(vec: Params) -> Params:
+        return ggn_mv(vec, data)
+
+    return wrapped_ggn_mv

@@ -2,25 +2,28 @@
 
 import functools
 import math
-from functools import partial
+from collections.abc import Generator
 
 import jax
 import jax.numpy as jnp
 
-from laplax.types import Any, Callable, PyTree, PyTreeDef
+from laplax.types import Any, Array, Callable, PyTree, PyTreeDef
+from laplax.util.utils import identity
 
 # ---------------------------------------------------------------
 # Flattening utilities
 # ---------------------------------------------------------------
 
 
-def cumsum(seq):
+def cumsum(seq: Generator) -> list[int]:
     """Takes a sequence and returns the cumsum sequence."""
     total = 0
     return [total := total + ele for ele in seq]
 
 
-def create_pytree_flattener(tree: PyTree):
+def create_pytree_flattener(
+    tree: PyTree,
+) -> tuple[Callable[[PyTree], Array], Callable[[Array], PyTree]]:
     """Create flatten and unflatten functions for a one-dimensional (vector) PyTree."""
 
     def flatten(tree: PyTree) -> jax.Array:
@@ -31,7 +34,7 @@ def create_pytree_flattener(tree: PyTree):
     flat, tree_def = jax.tree.flatten(tree)
     all_shapes = [leaf.shape for leaf in flat]
 
-    def unflatten(arr: jax.Array) -> PyTree:
+    def unflatten(arr: Array) -> PyTree:
         flat_vector_split = jnp.split(
             arr, cumsum(math.prod(sh) for sh in all_shapes)[:-1]
         )
@@ -46,7 +49,9 @@ def create_pytree_flattener(tree: PyTree):
     return flatten, unflatten
 
 
-def create_partial_pytree_flattener(tree: PyTree):
+def create_partial_pytree_flattener(
+    tree: PyTree,
+) -> tuple[Callable[[PyTree], Array], Callable[[Array], PyTree]]:
     """Create flatten and unflatten functions for partial PyTree arrays.
 
     Assumes an PyTree representing an array, where in each leaf the last
@@ -81,7 +86,7 @@ def create_partial_pytree_flattener(tree: PyTree):
 
 def flatten_pytree(
     tree: PyTree,
-) -> tuple[jax.Array, PyTreeDef, tuple[tuple]]:
+) -> tuple[Array, PyTreeDef, tuple[tuple[int, ...]]]:
     """Flattens a JAX PyTree into a 1D array."""
     leaves, tree_def = jax.tree.flatten(tree)
     flat_array = jnp.concatenate([jnp.ravel(leaf) for leaf in leaves])
@@ -90,38 +95,40 @@ def flatten_pytree(
     return flat_array, tree_def, shapes
 
 
-def get_inflate_pytree_fn(
-    tree_def: jax.tree_util.PyTreeDef, shapes: tuple[tuple]
-) -> Callable[[jax.Array], PyTree]:
-    # Convert arguments to tuples to be hashable (needed for jax.jit)
-    sizes = tuple(math.prod(shape).item() for shape in shapes)
-    split_indices = tuple(cumsum([0, *sizes[:-1]]).tolist())
+# def get_inflate_pytree_fn(
+#     tree_def: PyTreeDef, shapes: tuple[tuple[int, ...]]
+# ) -> Callable[[Array], PyTree]:
+#     # Convert arguments to tuples to be hashable (needed for jax.jit)
+#     sizes = tuple(math.prod(shape).item() for shape in shapes)
+#     split_indices = tuple(cumsum([0, *sizes[:-1]]).tolist())
 
-    @partial(jax.jit, static_argnums=(1, 2, 3, 4))
-    def inflate(
-        flat_array: jax.Array,
-        tree_def: jax.tree_util.PyTreeDef,
-        split_indices: tuple[int],
-        sizes: tuple[int],
-        shapes: tuple[tuple],
-    ):
-        leaves = []
-        for split_ind, size, shape in zip(split_indices, sizes, shapes, strict=False):
-            leaves.append(
-                jax.lax.dynamic_slice(flat_array, (split_ind,), (size,)).reshape(shape)
-            )
-        return jax.tree.unflatten(tree_def, leaves)
+#     @partial(jax.jit, static_argnums=(1, 2, 3, 4))
+#     def inflate(
+#         flat_array: Array,
+#         tree_def: PyTreeDef,
+#         split_indices: tuple[int],
+#         sizes: tuple[int],
+#         shapes: tuple[tuple],
+#     ):
+#         leaves = []
+#         for split_ind, size, shape in zip(split_indices, sizes, shapes, strict=False):
+#             leaves.append(
+#                 jax.lax.dynamic_slice(
+#                     flat_array, (split_ind,), (size,)
+#                 ).reshape(shape)
+#             )
+#         return jax.tree.unflatten(tree_def, leaves)
 
-    return partial(
-        inflate,
-        tree_def=tree_def,
-        split_indices=split_indices,
-        sizes=sizes,
-        shapes=shapes,
-    )
+#     return partial(
+#         inflate,
+#         tree_def=tree_def,
+#         split_indices=split_indices,
+#         sizes=sizes,
+#         shapes=shapes,
+#     )
 
 
-def flatten_hessian(hessian_pytree: PyTree, params_pytree: PyTree) -> jax.Array:
+def flatten_hessian(hessian_pytree: PyTree, params_pytree: PyTree) -> Array:
     """Flatten the Hessian matrix.
 
     Args:
@@ -154,17 +161,13 @@ def flatten_hessian(hessian_pytree: PyTree, params_pytree: PyTree) -> jax.Array:
     return full_hessian
 
 
-def identity(x: Any) -> Any:
-    return x
-
-
 def wrap_function(
     fn: Callable,
     input_fn: Callable | None = None,
     output_fn: Callable | None = None,
     argnums: int = 0,
 ) -> Callable:
-    def wrapper(*args, **kwargs):
+    def wrapper(*args, **kwargs) -> Any:
         # Use the identity function if input_fn or output_fn is None
         effective_input_fn = input_fn or identity
         effective_output_fn = output_fn or identity
@@ -187,7 +190,7 @@ def wrap_factory(
     factory: Callable,
     input_fn: Callable | None = None,
     output_fn: Callable | None = None,
-) -> any:
+) -> Callable:
     def wrapped_factory(*args, **kwargs) -> Callable:
         fn = factory(*args, **kwargs)
         return wrap_function(fn, input_fn, output_fn)
@@ -195,15 +198,20 @@ def wrap_factory(
     return wrapped_factory
 
 
-def inflate_and_flatten(flatten_fn: Callable, inflate_fn: Callable, argnums: int = 0):
-    def decorator(func):
+def inflate_and_flatten(
+    flatten_fn: Callable, inflate_fn: Callable, argnums: int = 0
+) -> Callable:
+    def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            # Convert args to list to allow modification
+            args_list = list(args)
+
             # Flatten the input to get the tree definition and shapes
-            args[argnums] = inflate_fn(args[argnums])
+            args_list[argnums] = inflate_fn(args[argnums])
 
             # Call the original function with the inflated input
-            result = func(*args, **kwargs)
+            result = func(*args_list, **kwargs)
 
             # Flatten the output
             flat_output = flatten_fn(result)
@@ -215,7 +223,7 @@ def inflate_and_flatten(flatten_fn: Callable, inflate_fn: Callable, argnums: int
     return decorator
 
 
-def unravel_array_into_pytree(pytree, axis, arr):
+def unravel_array_into_pytree(pytree: PyTree, axis: int, arr: Array) -> PyTree:
     """Unravel an array into a PyTree with a given structure.
 
     Args:
@@ -237,7 +245,7 @@ def unravel_array_into_pytree(pytree, axis, arr):
     return jax.tree.unflatten(treedef, reshaped_parts)
 
 
-def flatten_pytree_to_array(tree):
+def flatten_pytree_to_array(tree: PyTree) -> Array:
     """Flatten a PyTree into a 1D array."""
     flat, _ = jax.tree.flatten(tree)
     return jnp.concatenate([x.ravel() for x in flat])

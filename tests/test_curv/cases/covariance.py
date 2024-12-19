@@ -67,14 +67,14 @@ class LowRankCurvatureTask(CurvatureTask):
 
     @staticmethod
     def adjust_curv_est(low_rank_terms: dict):
-        U = low_rank_terms["U"]
-        S = low_rank_terms["S"]
+        U = low_rank_terms.U
+        S = low_rank_terms.S
         return U @ jnp.diag(S) @ U.T
 
     def adjust_prec(self, low_rank_terms: dict):
-        U = low_rank_terms["U"]
-        S = low_rank_terms["S"]
-        scalar = low_rank_terms["scalar"]
+        U = low_rank_terms.U
+        S = low_rank_terms.S
+        scalar = low_rank_terms.scalar
         return U @ jnp.diag(S) @ U.T + scalar * jnp.eye(self.size)
 
     @property

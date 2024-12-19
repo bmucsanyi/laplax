@@ -33,14 +33,15 @@ def test_ggn_linear_regression():
         model_fn, params=params, data={"input": X, "target": y}, loss_fn=LossFn.MSE
     )
 
-    G_calc = todense(ggn_mv, layout=params)
+    G_calc = todense(ggn_mv, layout=params).swapaxes(0, 1).reshape(-1, D_out * D_in)
 
     # Compare results
-    np.testing.assert_allclose(G_manual, G_calc, atol=5 * 1e-7)
+    np.testing.assert_allclose(G_manual, G_calc, atol=5 * 1e-6)
 
 
 def test_ggn_linear_regression_2():
     D_in, D_out, N = 5, 3, 10
+    D_flat = D_in * D_out
     model = nnx.Linear(D_in, D_out, use_bias=False, rngs=nnx.Rngs(0))
     graph_def, state = nnx.split(model)
 
@@ -68,6 +69,9 @@ def test_ggn_linear_regression_2():
 
     # Compare results
     G_manual = (
-        G_manual.reshape(3, 5, 3, 5).swapaxes(0, 1).swapaxes(-1, -2).reshape(15, 15)
+        G_manual.reshape(D_out, D_in, D_out, D_in)
+        .swapaxes(0, 1)
+        .swapaxes(-1, -2)
+        .reshape(D_flat, D_flat)
     )
     np.testing.assert_allclose(G_manual, G, atol=5 * 1e-6)

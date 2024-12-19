@@ -8,6 +8,7 @@ import pytest_cases
 
 from laplax.curv.cov import create_posterior_function
 from laplax.curv.ggn import create_ggn_mv
+from laplax.enums import CurvApprox
 from laplax.eval.calibrate import (
     calibration_metric,
     evaluate_for_given_prior_arguments,
@@ -18,7 +19,7 @@ from laplax.eval.pushforward import set_lin_pushforward
 from .cases.regression import case_regression
 
 
-@pytest_cases.parametrize("curv_op", ["full"])
+@pytest_cases.parametrize("curv_op", [CurvApprox.FULL])
 @pytest_cases.parametrize_with_cases("task", cases=case_regression)
 def test_lin_pushforward(curv_op, task):
     """Test for pipeline integration of calibration function."""
@@ -46,7 +47,7 @@ def test_lin_pushforward(curv_op, task):
         n_samples=5,  # TODO(2bys): Find a better way of setting this.
     )
 
-    def calibration_objective(prior_arguments, data):
+    def calibration_objective(prior_arguments):
         return evaluate_for_given_prior_arguments(
             prior_arguments=prior_arguments,
             data=data,
@@ -57,7 +58,6 @@ def test_lin_pushforward(curv_op, task):
     # Optimize
     prior_prec = optimize_prior_prec(
         objective=calibration_objective,
-        data=data,
         grid_size=10,
     )
 
@@ -69,10 +69,8 @@ def test_lin_pushforward(curv_op, task):
     )
 
     # Calculate
-    true_val = calibration_objective(
-        prior_arguments={"prior_prec": prior_prec}, data=data
-    )
+    true_val = calibration_objective(prior_arguments={"prior_prec": prior_prec})
     comparison_prec = calibration_objective(
-        prior_arguments={"prior_prec": prior_prec_interval[-1]}, data=data
+        prior_arguments={"prior_prec": prior_prec_interval[-1]}
     )
     assert true_val <= comparison_prec
