@@ -376,7 +376,7 @@ def register_curvature_method(
         ]
         msg = (
             "Either a default method must be provided or the following functions must "
-            f'be specified: {", ".join(missing_functions)}.'
+            f"be specified: {', '.join(missing_functions)}."
         )
         raise ValueError(msg)
 

@@ -1,9 +1,9 @@
-import logging
 import time
 from collections.abc import Callable
 
 import jax.numpy as jnp
 import numpy as np
+from loguru import logger
 
 from laplax.eval.metrics import estimate_q
 from laplax.types import Array, Data, Float, PriorArguments
@@ -48,21 +48,20 @@ def grid_search(
     for iteration, prior_prec in enumerate(prior_prec_interval):
         start_time = time.perf_counter()
         try:
-            result = objective(prior_arguments={"prior_prec": prior_prec})
+            result = objective({"prior_prec": prior_prec})
         except ValueError as error:
-            logging.warning("Caught an exception in validate: %s", error)
+            logger.warning(f"Caught an exception in validate {error}")
             result = float("inf")
 
         if jnp.isnan(result):
-            logging.info("Caught nan, setting result to inf.")
+            logger.info("Caught nan, setting result to inf.")
             result = float("inf")
 
         # Logging for performance and tracking
-        logging.info(
-            "Took %.4f seconds, prior prec: %.4f, result: %.6f",
-            time.perf_counter() - start_time,
-            prior_prec,
-            result,
+        logger.info(
+            f"Took {time.perf_counter() - start_time:.4f} seconds, "
+            f"prior prec: {prior_prec:.4f}, "
+            f"result: {result:.6f}",
         )
 
         results.append(result)
@@ -72,9 +71,7 @@ def grid_search(
         if previous_result is not None:
             if result > previous_result:
                 increasing_count += 1
-                logging.info(
-                    "Result increased, increasing_count = %d", increasing_count
-                )
+                logger.info(f"Result increased, increasing_count = {increasing_count}")
             else:
                 increasing_count = 0
 
@@ -86,11 +83,11 @@ def grid_search(
 
         # Check if maximum iterations reached
         if max_iterations is not None and iteration >= max_iterations:
-            logging.info("Stopping due to reaching max iterations: %d", max_iterations)
+            logger.info(f"Stopping due to reaching max iterations = {max_iterations}")
             break
 
     best_prior_prec = prior_precs[np.nanargmin(results)]
-    logging.info("Chosen prior prec: %.4f", best_prior_prec)
+    logger.info(f"Chosen prior prec = {best_prior_prec:.4f}")
 
     return best_prior_prec
 

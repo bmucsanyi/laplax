@@ -23,7 +23,7 @@ def input_target_split(batch: tuple[Array, Array]) -> Data:
 
 
 def reduce_add(
-    res_new: Any, state: None | Any = None, *, keepdims: bool = True, axis: int = 0
+    res_new: Any, state: Any | None = None, *, keepdims: bool = True, axis: int = 0
 ) -> tuple[Any, Any]:
     """Add reduction with accumulated sum in state."""
     summed = jax.tree_map(lambda x: jnp.sum(x, keepdims=keepdims, axis=axis), res_new)
@@ -40,7 +40,7 @@ def concat(tree1: PyTree, tree2: PyTree, axis: int = 0) -> PyTree:
 
 
 def reduce_concat(
-    res_new: Any, state: None | Any = None, *, axis: int = 0
+    res_new: Any, state: Any | None = None, *, axis: int = 0
 ) -> tuple[Any, Any]:
     """Concatenate with accumulated results in state."""
     if state is None:
@@ -49,7 +49,7 @@ def reduce_concat(
     return new_state, new_state
 
 
-def reduce_online_mean(res_new: Any, state: None | tuple = None) -> tuple[Any, tuple]:
+def reduce_online_mean(res_new: Any, state: tuple | None = None) -> tuple[Any, tuple]:
     """Online mean with (count, running_sum) as state to avoid storing means."""
     batch_size = jax.tree_map(lambda x: x.shape[0] if x.ndim > 0 else 1, res_new)
     batch_sum = jax.tree_map(
