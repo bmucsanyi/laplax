@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Operating System :: OS Independent",
 ]
-dependencies = ["jax", "jaxtyping"]
+dependencies = ["jax", "jaxtyping", "loguru"]
 description = "Laplace approximations in JAX."
 dynamic = ["version"]
 keywords = [
@@ -49,7 +49,6 @@ notebooks = [
     "optax",
     "flax",
 ]
-
 docs = [
     "mkdocs",
     "mkdocs-material",
