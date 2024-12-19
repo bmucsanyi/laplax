@@ -5,7 +5,7 @@ The curvature module provides implementations for various curvature approximatio
 ## Overview
 
 
-### Curvature methods
+### Curvatures
 Currently supported curvatures are the:
 
 - **GGN (Generalized Gauss-Newton)**: Efficient matrix-vector products for neural networks
@@ -27,7 +27,7 @@ Each method leads to a corresponding weight space covariance matrix-vector produ
 
 ### Generalized Gauss-Newton (GGN)
 
-The GGN module provides efficient implementations of Generalized Gauss-Newton matrix-vector products.
+The `laplax.curv.ggn` module provides efficient implementations of Generalized Gauss-Newton matrix-vector products.
 
 ::: laplax.curv.ggn.create_ggn_mv
     options:
@@ -48,11 +48,40 @@ The GGN module provides efficient implementations of Generalized Gauss-Newton ma
       members_order: source
 
 
+### Hessian
+
+The `laplax.curv.hessian` module provides an implementation of the neural network weight space hessian-vector product. 
+
+::: laplax.curv.hessian.create_hessian_mv
+    options:
+      show_root_heading: true
+      show_source: true
+      members_order: source
+
+::: laplax.curv.hessian.create_hessian_mv_without_data
+    options:
+      show_root_heading: true
+      show_source: true
+      members_order: source
+
+::: laplax.curv.hessian.concatenate_model_and_loss_fn
+    options:
+      show_root_heading: true
+      show_source: true
+      members_order: source
+
 
 ## Curvature Approximations
 
 ### Full approxmation
 
+This essentially denses the curvature matrix-vector product to a full array and uses it as the covariance precision for creating the weight space posterior covariance.
+
+::: laplax.curv.cov.create_full_curvature
+    options: 
+      show_root_heading: true
+      show_source: true
+      members_order: source
 
 
 ### Low Rank Approximations

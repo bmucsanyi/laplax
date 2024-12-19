@@ -6,20 +6,25 @@ from functools import partial
 import jax
 
 from laplax.curv.hessian import hvp
+from laplax.enums import LossFn
+from laplax.types import Array, Data, ModelFn, Num, Params
 from laplax.util.ops import lmap
+from laplax.util.tree import mul
 
 # ---------------------------------------------------------------------
 # Loss Hessian
 # ---------------------------------------------------------------------
 
 
-def create_loss_hessian_mv(loss_fn: str | Callable) -> Callable:
+def create_loss_hessian_mv(
+    loss_fn: LossFn
+    | Callable[[Num[Array, "..."], Num[Array, "..."]], Num[Array, "..."]],
+) -> Callable:
     """Return the Hessian-vector product for a given loss function.
 
     Create a function to compute the Hessian-vector product for a specified loss
     function.
 
-    $$ 5 + 5 = 10 $$
     Args:
         loss_fn (str | Callable):
             The loss function for which the Hessian-vector product is computed.
@@ -76,15 +81,20 @@ def create_loss_hessian_mv(loss_fn: str | Callable) -> Callable:
 
 
 def create_ggn_mv_without_data(
-    model_fn: Callable,
-    params: dict,
-    loss_fn: str | Callable,
+    model_fn: ModelFn,
+    params: Params,
+    loss_fn: LossFn | Callable,
+    factor: float = 1.0,
     **kwargs,
-) -> Callable:
+) -> Callable[[Params, Data], Params]:
     """GGN-mv function without hardcoded data batch.
 
     Create a GGN-mv function that computes the Generalized Gauss-Newton (GGN) matrix-
     vector product without hardcoding the dataset.
+
+    The formula for the GGN-mv is given by:
+
+    $$ J_p^T H_L J_p v $$
 
     Args:
         model_fn (Callable):
@@ -105,44 +115,58 @@ def create_ggn_mv_without_data(
             for the specified model and loss function.
     """
 
-    def jvp_fn(params, input, vec):
+    def _jvp_fn(
+        params: Params, input: Num[Array, "..."], vec: Params
+    ) -> Num[Array, "..."]:
         return jax.jvp(lambda p: model_fn(params=p, input=input), (params,), (vec,))
 
-    def vjp_fn(params, input):
+    def _vjp_fn(
+        params: Params, input: Num[Array, "..."]
+    ) -> Callable[[Num[Array, "..."]], Params]:
         return jax.vjp(lambda p: model_fn(params=p, input=input), params)
 
     loss_hessian_mv = create_loss_hessian_mv(loss_fn)
 
-    def mv_ggn_ptw(input, target, vec):
+    def _mv_ggn_ptw(
+        input: Num[Array, "..."], target: Num[Array, "..."], vec: Params
+    ) -> Params:
         """Calculate JT_p H_L J_p v for a single data point."""
-        pred, jv = jvp_fn(params, input, vec)
+        pred, jv = _jvp_fn(params, input, vec)
         hjv = loss_hessian_mv(jv, pred=pred, target=target)
-        gv = vjp_fn(params, input)[1](hjv)[0]
+        gv = _vjp_fn(params, input)[1](hjv)[0]
         return gv
 
-    def mv_ggn(vec, data):
-        def mv_ggn_ptw_w_vec(dp):
+    def mv_ggn(vec: Params, data: Data) -> Params:
+        def _mv_ggn_ptw_w_vec(dp: Data) -> Params:
             input, target = (
                 dp["input"],
                 dp["target"],
             )  # TODO(2bys): Do we want this constrain?
-            return mv_ggn_ptw(input, target, vec)
+            return _mv_ggn_ptw(input, target, vec)
 
-        return jax.lax.psum(
-            lmap(mv_ggn_ptw_w_vec, data, batch_size=kwargs.get("lmap_ggn_mv", "data")),
-            axis_name=0,
-        )
+        return mul(
+            factor,
+            jax.lax.psum(
+                lmap(
+                    _mv_ggn_ptw_w_vec,
+                    data,
+                    batch_size=kwargs.get("lmap_ggn_mv", "data"),
+                ),
+                axis_name=0,
+            ),
+        )  # TODO(any): Should we handle the case factor=1. as a identity map?
+        # (Possibly in util.tree.mul directly.)
 
     return mv_ggn
 
 
 def create_ggn_mv(
-    model_fn: Callable,
-    params: dict,
-    data: tuple[jax.Array, jax.Array],
-    loss_fn: str | Callable,
+    model_fn: ModelFn,
+    params: Params,
+    data: Data,
+    loss_fn: LossFn | Callable,
     **kwargs,
-) -> Callable:
+) -> Callable[[Params], Params]:
     """GGN-mv factory function with hardcoded data batch.
 
     Create a GGN-mv function that computes the Generalized Gauss-Newton (GGN) matrix-
@@ -168,7 +192,7 @@ def create_ggn_mv(
             model
             and dataset.
     """
-    mv_ggn = create_ggn_mv_without_data(
+    ggn_mv = create_ggn_mv_without_data(
         model_fn=model_fn, params=params, loss_fn=loss_fn, **kwargs
     )
-    return partial(mv_ggn, data=data)
+    return partial(ggn_mv, data=data)

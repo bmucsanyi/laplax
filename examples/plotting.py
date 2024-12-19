@@ -1,5 +1,9 @@
 """Plotting utilities."""
 
+from pathlib import Path
+
+import jax
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 
@@ -59,3 +63,53 @@ def plot_regression_with_uncertainty(  # noqa: PLR0913, PLR0917
 
     # Show the plot
     plt.show()
+
+
+def create_reliability_diagram(
+    bin_confidences: jax.Array,
+    bin_accuracies: jax.Array,
+    num_bins: int,
+    save_path: Path | None = None,
+) -> None:
+    fig, ax = plt.subplots()
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.grid(visible=True, axis="y")
+
+    bar_centers = jnp.linspace(0, 1, num_bins + 1)[:-1] + 1 / (2 * num_bins)
+    bar_width = 1 / num_bins
+
+    ax.bar(
+        x=bar_centers,
+        height=bin_accuracies,
+        width=bar_width,
+        label="Outputs",
+        color="blue",
+        edgecolor="black",
+    )
+
+    ax.bar(
+        x=bar_centers,
+        height=bin_confidences - bin_accuracies,
+        width=bar_width / 2,
+        bottom=bin_accuracies,
+        label="Gap",
+        color="red",
+        edgecolor="red",
+        alpha=0.4,
+    )
+
+    ax.plot([0, 1], [0, 1], transform=plt.gca().transAxes, linestyle="--", color="gray")
+    ax.set_xlabel("Confidence")
+    ax.set_ylabel("Accuracy")
+    fig.legend()
+
+    ax.set_aspect("equal")
+
+    if save_path is not None:
+        fig.savefig(save_path)
+        fig.clear()
+
+    else:
+        plt.show()

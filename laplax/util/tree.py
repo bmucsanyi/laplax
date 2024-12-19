@@ -8,7 +8,7 @@ from itertools import starmap
 import jax
 import jax.numpy as jnp
 
-from laplax.types import KeyType, PyTree
+from laplax.types import Float, KeyType, PyTree
 from laplax.util.flatten import unravel_array_into_pytree
 from laplax.util.ops import lmap
 
@@ -130,6 +130,10 @@ def neg(tree: PyTree) -> PyTree:
 
 def sub(tree1: PyTree, tree2: PyTree) -> PyTree:
     return add(tree1, neg(tree2))
+
+
+def mul(scalar: Float, tree: PyTree) -> PyTree:
+    return jax.tree.map(lambda x: scalar * x, tree)
 
 
 def sqrt(tree: PyTree) -> PyTree:

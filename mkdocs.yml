@@ -2,7 +2,7 @@ site_name: "laplax"
 site_url: "https://laplax-org.github.io/laplax/"
 repo_url: "https://github.com/laplax-org/laplax"
 repo_name: "laplax-org/laplax"
-
+strict: false
 
 theme:
   name: "material"
@@ -34,8 +34,10 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Design Philosophy: design_philosophy.md
   - Examples:
     - Posterior GP Kernel: examples/0001_posterior_gp_kernel.ipynb
+    - Laplace on MNIST: examples/0002_laplax_on_mnist.ipynb
   - API reference:
     - Curvature: api/curvature.md
 plugins:
@@ -47,18 +49,31 @@ plugins:
           setup_commands:
             - import pytkdocs_tweaks
             - pytkdocs_tweaks.main()
-          selection:
-            inherited_members: true
-          rendering:
-            show_root_heading: true # show the root heading, e.g. "laplax.curv.ggn"
-            show_root_full_path: true # show the full path, e.g. "laplax.curv.ggn.create_ggn_mv"
-            show_if_no_docstring: true # show the function even if it has no docstring
-            show_signature_annotations: true # show the signature annotations, e.g. "(data: Array, model: Model) -> Array"
-            show_source: true # show the source code of the function            
-            members_order: source # order the members by source code, not alphabetically
-            heading_level: 4
+          #rendering:
+            # show_root_heading: true # show the root heading, e.g. "laplax.curv.ggn"
+            # show_root_full_path: true # show the full path, e.g. "laplax.curv.ggn.create_ggn_mv"
+            # show_if_no_docstring: true # show the function even if it has no docstring
+            # show_signature_annotations: false # show the signature annotations, e.g. "(data: Array, model: Model) -> Array"
+            # show_source: true # show the source code of the function            
+            # members_order: source # order the members by source code, not alphabetically
+            # heading_level: 4
+          options:
+            show_signature: false # Whether to show the full function signature
+            seperate_signature: true # Is not working; should seperate function and signature to extra line.
+            show_signature_annotations: true
+            signature_crossrefs: true
+            heading_style: "atx"
+            docstring_style: "google"
+            signature_style: "css"
+            css_dir: "docs/css"
+
+
   - mknotebooks:
       execute: false
       write_markdown: true 
       enable_default_jupyter_cell_styling: true
+
+extra_css:
+  - css/custom.css
+
 

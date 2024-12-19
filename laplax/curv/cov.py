@@ -5,7 +5,8 @@ import jax.numpy as jnp
 
 from laplax import util
 from laplax.curv.low_rank import get_low_rank_approximation
-from laplax.types import Callable, PyTree
+from laplax.enums import CurvApprox
+from laplax.types import Array, Callable, CurvatureMV, Num, PyTree
 from laplax.util.flatten import (
     create_partial_pytree_flattener,
     create_pytree_flattener,
@@ -19,7 +20,7 @@ from laplax.util.mv import diagonal, todense
 # -----------------------------------------------------------------------
 
 
-def create_full_curvature(mv: Callable, layout: PyTree, **kwargs):
+def create_full_curvature(mv: CurvatureMV, layout: PyTree | int, **kwargs):
     """Generate a full curvature approximation."""
     del kwargs
     curv_est = todense(mv, layout=layout)
@@ -27,14 +28,15 @@ def create_full_curvature(mv: Callable, layout: PyTree, **kwargs):
     return flatten_partial_tree(curv_est)
 
 
-def full_with_prior(curv_est: jax.Array, **kwargs):
-    return curv_est + kwargs.get("prior_prec") * jnp.eye(curv_est.shape[-1])
+def full_with_prior(
+    curv_est: Num[Array, "..."], prior_arguments: dict[str, Num[Array, "..."]]
+):
+    return curv_est + prior_arguments.get("prior_prec") * jnp.eye(curv_est.shape[-1])
 
 
-def prec_to_scale(prec: jax.Array) -> jax.Array:
+def prec_to_scale(prec: Num[Array, "..."]) -> Num[Array, "..."]:
     """Implementation of the corresponding torch function.
 
-    $$ 5 + 5 = 10 $$
     See: torch.distributions.multivariate_normal._precision_to_scale_tril.
     """
     Lf = jnp.linalg.cholesky(jnp.flip(prec, axis=(-2, -1)))
@@ -49,7 +51,7 @@ def prec_to_scale(prec: jax.Array) -> jax.Array:
     return L
 
 
-def full_prec_to_state(prec: jax.Array) -> jax.Array:
+def full_prec_to_state(prec: Num[Array, "..."]) -> dict[str, Num[Array, "..."]]:
     scale = prec_to_scale(prec)
 
     return {"scale": scale}
@@ -74,6 +76,7 @@ def full_state_to_cov(state: dict) -> jax.Array:
 # ---------------------------------------------------------------------------------
 # Diagonal
 # ---------------------------------------------------------------------------------
+from laplax.types import PosteriorState
 
 
 def create_diagonal_curvature(mv: Callable, **kwargs):
@@ -86,18 +89,18 @@ def diag_with_prior(curv_est: jax.Array, **kwargs):
     return curv_est + kwargs.get("prior_prec") * jnp.ones_like(curv_est.shape[-1])
 
 
-def diag_prec_to_state(prec: jax.Array) -> dict:
+def diag_prec_to_state(prec: jax.Array) -> PosteriorState:
     return {"scale": jnp.sqrt(jnp.reciprocal(prec))}
 
 
-def diag_state_to_scale(state: dict) -> Callable:
+def diag_state_to_scale(state: PosteriorState) -> Callable:
     def diag_mv(vec):
         return state["scale"] * vec
 
     return diag_mv
 
 
-def diag_state_to_cov(state: dict) -> Callable:
+def diag_state_to_cov(state: PosteriorState) -> Callable:
     arr = state["scale"] ** 2
 
     def diag_mv(vec):
@@ -210,7 +213,10 @@ CURVATURE_STATE_TO_COV = {
 
 
 def create_posterior_function(
-    curvature_type: str, mv: Callable, layout: int | PyTree | None = None, **kwargs
+    curvature_type: CurvApprox,
+    mv: Callable[[PyTree[Num[Array, "..."]]], PyTree[Num[Array, "..."]]],
+    layout: int | PyTree | None = None,
+    **kwargs,
 ) -> Callable:
     """Factory function to create posterior covariance functions based on curv. type.
 
