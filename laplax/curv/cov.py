@@ -280,7 +280,7 @@ def create_posterior_function(
 # ----------------------------------------------------------------------------------
 
 
-def register_curvature_method(  # noqa: PLR0913
+def register_curvature_method(
     name: str,
     *,
     create_fn: Callable | None = None,

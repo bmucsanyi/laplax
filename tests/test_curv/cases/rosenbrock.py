@@ -17,7 +17,8 @@ def rosenbrock_first(x: jnp.ndarray, alpha: float):
     Returns:
         A two-dimensional vector containing the evaluation.
     """
-    assert x.ndim == 1 and math.prod(x.shape) == 2  # noqa: PT018, S101
+    assert x.ndim == 1
+    assert math.prod(x.shape) == 2
 
     g0, g1 = 1 - x[0], sqrt(alpha) * (x[1] - x[0] ** 2)
     return jnp.stack([g0, g1])
@@ -32,14 +33,16 @@ def rosenbrock_last(g: jnp.ndarray):
     Returns:
         The evaluatoin of the last sub-function (a scalar).
     """
-    assert g.ndim == 1 and math.prod(g.shape) == 2  # noqa: PT018, S101
+    assert g.ndim == 1
+    assert math.prod(g.shape) == 2
     return jnp.sum(g**2)
 
 
 def rosenbrock_fn(
     x: jnp.ndarray,
     alpha: float,
-    return_first: bool = False,  # noqa: FBT001, FBT002
+    *,
+    return_first: bool = False,
 ) -> jnp.ndarray | tuple[jnp.ndarray, jnp.ndarray]:
     """Evaluate the Rosenbrock function.
 
@@ -55,7 +58,8 @@ def rosenbrock_fn(
         evaluation of the last sub-function and the first
         sub-function is returned.
     """
-    assert x.ndim == 1 and math.prod(x.shape) == 2  # noqa: PT018, S101
+    assert x.ndim == 1
+    assert math.prod(x.shape) == 2
 
     first = rosenbrock_first(x, alpha)
     last = rosenbrock_last(first)
@@ -76,11 +80,11 @@ class RosenbrockCase:
 
     @property
     def model_fn(self):
-        return lambda params, input: rosenbrock_first(params, alpha=self.alpha)
+        return lambda params, input: rosenbrock_first(params, alpha=self.alpha)  # noqa: ARG005
 
     @property
     def loss_fn(self):
-        return lambda pred, target: rosenbrock_last(pred)
+        return lambda pred, target: rosenbrock_last(pred)  # noqa: ARG005
 
     @property
     def hessian_manual(

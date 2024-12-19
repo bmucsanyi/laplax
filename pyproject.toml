@@ -15,6 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
     "Operating System :: OS Independent",
 ]
@@ -28,7 +29,7 @@ keywords = [
 ]
 name = "laplax"
 readme = "README.md"
-requires-python = ">=3.10,<3.12"
+requires-python = ">=3.10,<3.13"
 
 [project.optional-dependencies]
 dev = [
@@ -39,8 +40,10 @@ dev = [
     "tox-uv",
     "pyright",
     "pytest-cases",
+    "flax",
+    "equinox",
+    "matplotlib",
 ]
-test = ["flax", "equinox"]
 
 # PEP 518 Build System Configuration
 # See https://peps.python.org/pep-0518/
@@ -69,7 +72,7 @@ addopts = ["--import-mode=importlib"]
 preview = true
 extend-include = ["*.ipynb"]
 exclude = [".git", "__pycache__"]
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = [
@@ -139,34 +142,73 @@ ignore = [
     "COM819",
     "ISC001",
     "ISC002",
+    "FBT001",
+    "FBT003",
+    "TD003",
+    # It is fine to override loop variables when it is clear that only the value that
+    # overrides the original is needed
+    "PLW2901",
+    # An `Any` type hint is often the best type hint one can give for an argument. That
+    # being said, it is important to only use `Any` when all other possibilities have
+    # been exhausted
+    "ANN401",
+    # Specifically in this project it is impossible to adhere to a limit on the number
+    # of statements per function/method without abstracting functions to an unnecessary
+    # level
+    "PLR0915",
+    # It is often impossible to enforce a hard limit on the number of arguments
+    "PLR0913",
+    "PLR0917",
+    # The performance of logging is not a concern for us; in return, using f-strings
+    # makes the logged messages much more readable in code
+    "G004",
+    # We do not annotate __init__ methods -- args are specified in the class docstring
+    "D107",
     # This is research code, attribute names are more flexible with casing
     "E741",
     "N802",
     "N803",
     "N806",
+    "N812",
     # Magic values are fine for academic code as longs as they are not overused
     "PLR2004",
     "PLR0912",
     "PLR0912",
     "PLR0914",
     "PLR0914",
+    # In-place assigments are not always possible in torch
+    "PLR6104",
     # Assignments before return can emphasize the code's semantic structure
     "RET504",
     "S403",
-    # Currently set some simplifications
-    "ERA001", # no-commented out code
-    "D102", # no docstrings
-    "ANN401", # no type hints
-    "ANN202", # no type hints
-    "ANN001", # no type hints
-    "ANN003", # no type hints
-    "ANN201", # no type hints
-    "D103", # no docstrings
-    "TD003", #Found TODO in code
+    # We don't do cryptography
+    "S311",
+    # The subprocess module is fine as long as one validates the commands
+    "S404",
+    # The additional ignore rules below are temporary. They simplify the alpha stage
+    # of the project
+    # 1. Commented-out code is fine for now
+    "ERA001",
+    # 2. Docstrings are not required for now
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    # 3. Type hints are not required for now
+    "ANN201",
+    "ANN202",
+    "ANN204",
+    "ANN205",
+    "ANN001",
+    "ANN002",
+    "ANN003",
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
-"test_*.py" = ["S101"] # Use of assert is allowed in test files
+"tests/*.py" = ["S101"] # Use of assert is allowed in test files
+"*.ipynb" = ["T201"]  # Print statements are fine in notebooks
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18

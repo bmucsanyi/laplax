@@ -6,7 +6,7 @@ import pytest_cases
 from laplax.curv.cov import create_posterior_function
 from laplax.curv.ggn import create_ggn_mv
 from laplax.eval.metrics import DEFAULT_REGRESSION_METRICS
-from laplax.eval.push_forward import set_lin_pushforward
+from laplax.eval.pushforward import set_lin_pushforward
 from laplax.eval.utils import evaluate_metrics_on_dataset
 
 from .cases.regression import case_regression

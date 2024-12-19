@@ -40,10 +40,10 @@ class CurvatureTask:
         self.u = u
         self.s = s
 
-    def adjust_curv_est(self):
+    def adjust_curv_est(self, *args, **kwargs):
         raise NotImplementedError
 
-    def adjust_prec(self):
+    def adjust_prec(self, *args, **kwargs):
         raise NotImplementedError
 
     @property
@@ -65,7 +65,8 @@ class CurvatureTask:
 class LowRankCurvatureTask(CurvatureTask):
     method = "low_rank"
 
-    def adjust_curv_est(self, low_rank_terms: dict):
+    @staticmethod
+    def adjust_curv_est(low_rank_terms: dict):
         U = low_rank_terms["U"]
         S = low_rank_terms["S"]
         return U @ jnp.diag(S) @ U.T
@@ -84,10 +85,12 @@ class LowRankCurvatureTask(CurvatureTask):
 class DiagonalCurvatureTask(CurvatureTask):
     method = "diagonal"
 
-    def adjust_curv_est(self, curv_est):
+    @staticmethod
+    def adjust_curv_est(curv_est):
         return jnp.diag(curv_est)
 
-    def adjust_prec(self, prec):
+    @staticmethod
+    def adjust_prec(prec):
         return jnp.diag(prec)
 
     @property
@@ -98,10 +101,12 @@ class DiagonalCurvatureTask(CurvatureTask):
 class FullCurvatureTask(CurvatureTask):
     method = "full"
 
-    def adjust_curv_est(self, curv_est):
+    @staticmethod
+    def adjust_curv_est(curv_est):
         return curv_est
 
-    def adjust_prec(self, prec):
+    @staticmethod
+    def adjust_prec(prec):
         return prec
 
     @property

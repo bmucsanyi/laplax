@@ -1,11 +1,10 @@
-# noqa: D100
 from collections import OrderedDict
 
 import jax
 
 from laplax.types import Callable
 from laplax.util.ops import lmap
-from laplax.util.util import identity
+from laplax.util.utils import identity
 
 
 def finalize_functions(functions: OrderedDict, results: dict, **kwargs):
@@ -38,7 +37,7 @@ def evaluate_on_dataset(pred_fn: Callable, data: tuple[jax.Array], **kwargs) -> 
     return lmap(evaluate_data_point, data, batch_size=kwargs.get("lmap_eval", "data"))
 
 
-def evaluate_metrics_on_dataset(  # noqa: D417
+def evaluate_metrics_on_dataset(
     pred_fn: Callable,
     data: tuple[jax.Array],
     *,
@@ -52,6 +51,8 @@ def evaluate_metrics_on_dataset(  # noqa: D417
         pred_fn: A callable that takes an input and returns predictions.
         data: A tuple of input data and target data.
         metrics: A list of callable metrics or a single callable metric.
+        apply: Callable to apply to the evaluated metrics.
+        kwargs: Additional keyword arguments.
 
     Returns:
         A dictionary containing the evaluated metrics.
