@@ -64,7 +64,7 @@ from jax.experimental.sparse.linalg import (
     _mm,  # noqa: PLC2701
 )
 
-from laplax.types import Callable, DType
+from laplax.types import Array, Callable, DType
 
 
 def lobpcg_standard(
@@ -72,11 +72,11 @@ def lobpcg_standard(
     X: jax.Array,
     m: int = 100,
     tol: jax.Array | float | None = None,
-    calc_dtype: DType = jnp.float64,  # dtype for internal calculations
-    a_dtype: DType = jnp.float32,  # dtype for A calls
+    calc_dtype: DType = jnp.float64,
+    a_dtype: DType = jnp.float32,
     *,
     A_jittable: bool = True,
-):
+) -> tuple[jax.Array, jax.Array, int]:
     """Compute top-k eigenvalues using LOBPCG with mixed precision.
 
     Args:
@@ -112,7 +112,7 @@ def lobpcg_standard(
 
     # JIT-ted iteration step that takes AX, AXPR, AS, etc. in calc_dtype
     @jax.jit
-    def iteration_first_step(X, P, R, AS):
+    def _iteration_first_step(X, P, R, AS):
         # Projected eigensolve
         XPR = jnp.concatenate((X, P, R), axis=1)
         theta, Q = _rayleigh_ritz_orth(AS, XPR)
@@ -135,7 +135,7 @@ def lobpcg_standard(
         return X, P, R, theta
 
     @jax.jit
-    def iteration_second_step(X, R, theta, AX, n, tol):
+    def _iteration_second_step(X, R, theta, AX, n, tol):
         # # Compute new residuals.
         # AX = A(X)
         R = AX - theta[jnp.newaxis, :k] * X
@@ -152,7 +152,7 @@ def lobpcg_standard(
         return X, R, theta[jnp.newaxis, :k], converged
 
     @jax.jit
-    def projection_step(X, P, R):
+    def _projection_step(X, P, R):
         R = _project_out(jnp.concatenate((X, P), axis=1), R)
         return R, jnp.concatenate((X, P, R), axis=1)
 
@@ -160,33 +160,33 @@ def lobpcg_standard(
     converged = 0
     while i < m and converged < k:
         # Residual basis selection
-        R, XPR = projection_step(X, P, R)
+        R, XPR = _projection_step(X, P, R)
 
         # Compute AS = AXPR = A(XPR) outside JIT at a_dtype
         AS = A(XPR.astype(a_dtype)).astype(calc_dtype)
 
         # Call the first iteration step
-        X, P, R, theta = iteration_first_step(X, P, R, AS)
+        X, P, R, theta = _iteration_first_step(X, P, R, AS)
 
         # Calculate AX
         AX = A(X.astype(a_dtype)).astype(calc_dtype)
 
         # Call the second iteration step
-        X, R, theta, converged = iteration_second_step(X, R, theta, AX, n, tol)
+        X, R, theta, converged = _iteration_second_step(X, R, theta, AX, n, tol)
 
         i += 1
 
     return theta[0, :], X, i
 
 
-def _orthonormalize(X, calc_dtype):
+def _orthonormalize(X: Array, calc_dtype: DType) -> Array:
     # Orthonormalize in calc_dtype
     for _ in range(2):
         X = _svqb(X, calc_dtype=calc_dtype)
     return X
 
 
-def _svqb(X, calc_dtype):
+def _svqb(X: Array, calc_dtype: DType) -> Array:
     X = X.astype(calc_dtype)
     norms = jnp.linalg.norm(X, ord=2, axis=0, keepdims=True)
     X /= jnp.where(norms == 0, 1.0, norms)
@@ -207,7 +207,7 @@ def _svqb(X, calc_dtype):
     return orthoX.astype(calc_dtype)
 
 
-def _extend_basis(X, m, calc_dtype):
+def _extend_basis(X: Array, m: int, calc_dtype: DType) -> Array:
     n, k = X.shape
     Xupper, Xlower = jnp.split(X, [k], axis=0)
     u, s, vt = jnp.linalg.svd(Xupper)
@@ -221,7 +221,7 @@ def _extend_basis(X, m, calc_dtype):
     return h.at[k:].add(other).astype(calc_dtype)
 
 
-def _project_out(basis, U):
+def _project_out(basis: Array, U: Array) -> Array:
     """Derives component of U in the orthogonal complement of basis."""
     for _ in range(2):
         U -= _mm(basis, _mm(basis.T, U))
@@ -237,7 +237,7 @@ def _project_out(basis, U):
     return U
 
 
-def _rayleigh_ritz_orth(AS, S):
+def _rayleigh_ritz_orth(AS: Array, S: Array) -> tuple[Array, Array]:
     """Solve the Rayleigh-Ritz problem for `A` projected to `S`.
 
     This identifies `w, V` which satisfies:

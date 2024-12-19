@@ -1,11 +1,25 @@
 """Posterior covariance functions for various curvature estimates."""
 
+from dataclasses import dataclass
+
 import jax
 import jax.numpy as jnp
 
 from laplax import util
-from laplax.curv.low_rank import get_low_rank_approximation
-from laplax.types import Callable, PyTree
+from laplax.curv.low_rank import LowRankTerms, get_low_rank_approximation
+from laplax.enums import CurvApprox
+from laplax.types import (
+    Any,
+    Array,
+    Callable,
+    CurvatureMV,
+    FlatParams,
+    Float,
+    Layout,
+    Num,
+    PosteriorState,
+    PyTree,
+)
 from laplax.util.flatten import (
     create_partial_pytree_flattener,
     create_pytree_flattener,
@@ -19,7 +33,9 @@ from laplax.util.mv import diagonal, todense
 # -----------------------------------------------------------------------
 
 
-def create_full_curvature(mv: Callable, layout: PyTree, **kwargs):
+def create_full_curvature(
+    mv: CurvatureMV, layout: Layout, **kwargs
+) -> Num[Array, "P P"]:  # noqa: F722
     """Generate a full curvature approximation."""
     del kwargs
     curv_est = todense(mv, layout=layout)
@@ -27,11 +43,16 @@ def create_full_curvature(mv: Callable, layout: PyTree, **kwargs):
     return flatten_partial_tree(curv_est)
 
 
-def full_with_prior(curv_est: jax.Array, **kwargs):
-    return curv_est + kwargs.get("prior_prec") * jnp.eye(curv_est.shape[-1])
+def full_with_prior(
+    curv_est: Num[Array, "P P"],  # noqa: F722
+    prior_prec: Float,
+    **kwargs,
+) -> Num[Array, "P P"]:  # noqa: F722
+    del kwargs
+    return curv_est + prior_prec * jnp.eye(curv_est.shape[-1])
 
 
-def prec_to_scale(prec: jax.Array) -> jax.Array:
+def prec_to_scale(prec: Num[Array, "P P"]) -> Num[Array, "P P"]:  # noqa: F722
     """Implementation of the corresponding torch function.
 
     See: torch.distributions.multivariate_normal._precision_to_scale_tril.
@@ -48,23 +69,29 @@ def prec_to_scale(prec: jax.Array) -> jax.Array:
     return L
 
 
-def full_prec_to_state(prec: jax.Array) -> jax.Array:
+def full_prec_to_state(
+    prec: Num[Array, "P P"],  # noqa: F722
+) -> dict[str, Num[Array, "P P"]]:  # noqa: F722
     scale = prec_to_scale(prec)
 
     return {"scale": scale}
 
 
-def full_state_to_scale(state: dict) -> jax.Array:
-    def scale_mv(vec: jax.Array) -> jax.Array:
+def full_state_to_scale(
+    state: dict[str, Num[Array, "P P"]],  # noqa: F722
+) -> Callable[[FlatParams], FlatParams]:
+    def scale_mv(vec: FlatParams) -> FlatParams:
         return state["scale"] @ vec
 
     return scale_mv
 
 
-def full_state_to_cov(state: dict) -> jax.Array:
+def full_state_to_cov(
+    state: dict[str, Num[Array, "P P"]],  # noqa: F722
+) -> Callable[[FlatParams], FlatParams]:
     cov = state["scale"] @ state["scale"].T
 
-    def cov_mv(vec: jax.Array) -> jax.Array:
+    def cov_mv(vec: FlatParams) -> FlatParams:
         return cov @ vec
 
     return cov_mv
@@ -75,31 +102,37 @@ def full_state_to_cov(state: dict) -> jax.Array:
 # ---------------------------------------------------------------------------------
 
 
-def create_diagonal_curvature(mv: Callable, **kwargs):
+def create_diagonal_curvature(mv: CurvatureMV, layout: Layout, **kwargs) -> FlatParams:
     """Generate a diagonal curvature."""
-    curv_diagonal = diagonal(mv, layout=kwargs.get("layout"))
+    del kwargs
+    curv_diagonal = diagonal(mv, layout=layout)
     return curv_diagonal
 
 
-def diag_with_prior(curv_est: jax.Array, **kwargs):
-    return curv_est + kwargs.get("prior_prec") * jnp.ones_like(curv_est.shape[-1])
+def diag_with_prior(curv_est: FlatParams, prior_prec: Float, **kwargs) -> FlatParams:
+    del kwargs
+    return curv_est + prior_prec * jnp.ones_like(curv_est.shape[-1])
 
 
-def diag_prec_to_state(prec: jax.Array) -> dict:
+def diag_prec_to_state(prec: FlatParams) -> dict[str, FlatParams]:
     return {"scale": jnp.sqrt(jnp.reciprocal(prec))}
 
 
-def diag_state_to_scale(state: dict) -> Callable:
-    def diag_mv(vec):
+def diag_state_to_scale(
+    state: dict[str, FlatParams],
+) -> Callable[[FlatParams], FlatParams]:
+    def diag_mv(vec: FlatParams) -> FlatParams:
         return state["scale"] * vec
 
     return diag_mv
 
 
-def diag_state_to_cov(state: dict) -> Callable:
+def diag_state_to_cov(
+    state: dict[str, FlatParams],
+) -> Callable[[FlatParams], FlatParams]:
     arr = state["scale"] ** 2
 
-    def diag_mv(vec):
+    def diag_mv(vec: FlatParams) -> FlatParams:
         return arr * vec
 
     return diag_mv
@@ -110,66 +143,73 @@ def diag_state_to_cov(state: dict) -> Callable:
 # ---------------------------------------------------------------------------------
 
 
-def create_low_rank_curvature(mv: Callable, **kwargs):
+def create_low_rank_curvature(
+    mv: CurvatureMV, layout: Layout, **kwargs
+) -> LowRankTerms:
     """Generate a create_pytree_flattener, low-rank curvature approximations."""
-    layout = kwargs.get("layout")
     flatten, unflatten = create_pytree_flattener(layout)
     nparams = util.tree.get_size(layout)
     mv = jax.vmap(
         wrap_function(fn=mv, input_fn=unflatten, output_fn=flatten),
         in_axes=-1,
         out_axes=-1,
-    )  # Needs matmul structure.
+    )  # Turn mv into matmul structure.
     low_rank_terms = get_low_rank_approximation(mv, size=nparams, **kwargs)
 
     return low_rank_terms
 
 
-def create_low_rank_mv(low_rank_terms: dict) -> Callable:
+def create_low_rank_mv(
+    low_rank_terms: LowRankTerms,
+) -> Callable[[FlatParams], FlatParams]:
     """Create a low-rank matrix-vector product."""
-    U = low_rank_terms["U"]
-    S = low_rank_terms["S"]
-    scalar = low_rank_terms["scalar"]
+    U, S, scalar = jax.tree_util.tree_leaves(low_rank_terms)
 
-    def low_rank_mv(vec: jax.Array) -> jax.Array:
+    def low_rank_mv(vec: FlatParams) -> FlatParams:
         return scalar * vec + U @ (S * (U.T @ vec))
 
     return low_rank_mv
 
 
-def low_rank_square(state: dict) -> Callable:
-    scalar, eigvals = state["scalar"], state["S"]
+def low_rank_square(state: LowRankTerms) -> LowRankTerms:
+    U, S, scalar = jax.tree_util.tree_leaves(state)
     scalar_sq = scalar**2
-    return {
-        "U": state["U"],
-        "S": (eigvals + scalar) ** 2 - scalar_sq,
-        "scalar": scalar_sq,
-    }
+    return LowRankTerms(
+        U=U,
+        S=(S + scalar) ** 2 - scalar_sq,
+        scalar=scalar_sq,
+    )
 
 
-def low_rank_with_prior(curv_est: dict, **kwargs):
-    curv_est["scalar"] = kwargs.get("prior_prec")
+def low_rank_with_prior(
+    curv_est: LowRankTerms, prior_prec: Float, **kwargs
+) -> LowRankTerms:
+    del kwargs
+    curv_est.scalar = prior_prec
     return curv_est
 
 
-def low_rank_prec_to_state(curv_est: dict):
-    scalar = curv_est["scalar"]
+def low_rank_prec_to_state(curv_est: LowRankTerms) -> dict[str, LowRankTerms]:
+    U, S, scalar = jax.tree_util.tree_leaves(curv_est)
     scalar_sqrt_inv = jnp.reciprocal(jnp.sqrt(scalar))
-    eigvals = curv_est["S"]
     return {
-        "scale": {
-            "U": curv_est["U"],
-            "S": jnp.reciprocal(jnp.sqrt(eigvals + scalar)) - scalar_sqrt_inv,
-            "scalar": scalar_sqrt_inv,
-        }
+        "scale": LowRankTerms(
+            U=U,
+            S=jnp.reciprocal(jnp.sqrt(S + scalar)) - scalar_sqrt_inv,
+            scalar=scalar_sqrt_inv,
+        )
     }
 
 
-def low_rank_state_to_scale(state: dict) -> Callable:
+def low_rank_state_to_scale(
+    state: dict[str, LowRankTerms],
+) -> Callable[[FlatParams], FlatParams]:
     return create_low_rank_mv(state["scale"])
 
 
-def low_rank_state_to_cov(state: dict) -> Callable:
+def low_rank_state_to_cov(
+    state: dict[str, LowRankTerms],
+) -> Callable[[FlatParams], FlatParams]:
     return create_low_rank_mv(low_rank_square(state["scale"]))
 
 
@@ -178,38 +218,47 @@ def low_rank_state_to_cov(state: dict) -> Callable:
 # ---------------------------------------------------------------------------------
 
 CURVATURE_METHODS = {
-    "full": create_full_curvature,
-    "diagonal": create_diagonal_curvature,
-    "low_rank": create_low_rank_curvature,
+    CurvApprox.FULL: create_full_curvature,
+    CurvApprox.DIAGONAL: create_diagonal_curvature,
+    CurvApprox.LOW_RANK: create_low_rank_curvature,
 }
 
 CURVATURE_PRIOR_METHODS = {
-    "full": full_with_prior,
-    "diagonal": diag_with_prior,
-    "low_rank": low_rank_with_prior,
+    CurvApprox.FULL: full_with_prior,
+    CurvApprox.DIAGONAL: diag_with_prior,
+    CurvApprox.LOW_RANK: low_rank_with_prior,
 }
-
 CURVATURE_TO_POSTERIOR_STATE = {
-    "full": full_prec_to_state,
-    "diagonal": diag_prec_to_state,
-    "low_rank": low_rank_prec_to_state,
+    CurvApprox.FULL: full_prec_to_state,
+    CurvApprox.DIAGONAL: diag_prec_to_state,
+    CurvApprox.LOW_RANK: low_rank_prec_to_state,
 }
 
 CURVATURE_STATE_TO_SCALE = {
-    "full": full_state_to_scale,
-    "diagonal": diag_state_to_scale,
-    "low_rank": low_rank_state_to_scale,
+    CurvApprox.FULL: full_state_to_scale,
+    CurvApprox.DIAGONAL: diag_state_to_scale,
+    CurvApprox.LOW_RANK: low_rank_state_to_scale,
 }
 
 CURVATURE_STATE_TO_COV = {
-    "full": full_state_to_cov,
-    "diagonal": diag_state_to_cov,
-    "low_rank": low_rank_state_to_cov,
+    CurvApprox.FULL: full_state_to_cov,
+    CurvApprox.DIAGONAL: diag_state_to_cov,
+    CurvApprox.LOW_RANK: low_rank_state_to_cov,
 }
 
 
+@dataclass
+class Posterior:
+    state: PosteriorState
+    cov_mv: Callable[[FlatParams], FlatParams]
+    scale_mv: Callable[[FlatParams], FlatParams]
+
+
 def create_posterior_function(
-    curvature_type: str, mv: Callable, layout: int | PyTree | None = None, **kwargs
+    curvature_type: CurvApprox | str,  # str is for user-specified methods.
+    mv: CurvatureMV,
+    layout: Layout | None = None,
+    **kwargs,
 ) -> Callable:
     """Factory function to create posterior covariance functions based on curv. type.
 
@@ -241,7 +290,7 @@ def create_posterior_function(
     # Retrieve the curvature estimator based on the provided type
     curv_estimator = CURVATURE_METHODS[curvature_type](mv, layout=layout, **kwargs)
 
-    def posterior_function(**posterior_kwargs) -> dict[str, any]:
+    def posterior_function(**posterior_kwargs) -> PosteriorState:
         """Posterior function to compute covariance and scale-related functions.
 
         Parameters:
@@ -249,7 +298,7 @@ def create_posterior_function(
                 computations.
 
         Returns:
-            Dict[str, any]: Dictionary containing:
+            PosteriorState: Dictionary containing:
                 - 'state': Updated state of the posterior.
                 - 'cov_mv': Function to compute covariance matrix-vector product.
                 - 'scale_mv': Function to compute scale matrix-vector product.
@@ -266,11 +315,11 @@ def create_posterior_function(
         scale_mv_from_state = CURVATURE_STATE_TO_SCALE[curvature_type]
         cov_mv_from_state = CURVATURE_STATE_TO_COV[curvature_type]
 
-        return {
-            "state": state,
-            "cov_mv": wrap_factory(cov_mv_from_state, flatten, unflatten),
-            "scale_mv": wrap_factory(scale_mv_from_state, flatten, unflatten),
-        }
+        return Posterior(
+            state=state,
+            cov_mv=wrap_factory(cov_mv_from_state, flatten, unflatten),
+            scale_mv=wrap_factory(scale_mv_from_state, flatten, unflatten),
+        )
 
     return posterior_function
 
@@ -283,13 +332,15 @@ def create_posterior_function(
 def register_curvature_method(
     name: str,
     *,
-    create_fn: Callable | None = None,
+    create_fn: Callable[[CurvatureMV, Layout, Any], Any] | None = None,
     prior_fn: Callable | None = None,
     posterior_fn: Callable | None = None,
-    scale_fn: Callable | None = None,
-    cov_fn: Callable | None = None,
-    default: str | None = None,
-):
+    scale_fn: Callable[[PosteriorState], Callable[[FlatParams], FlatParams]]
+    | None = None,
+    cov_fn: Callable[[PosteriorState], Callable[[FlatParams], FlatParams]]
+    | None = None,
+    default: CurvApprox | None = None,
+) -> None:
     """Register a new curvature method with optional custom functions.
 
     Parameters:
@@ -299,8 +350,8 @@ def register_curvature_method(
         posterior_fn (Callable, optional): Custom posterior state function.
         scale_fn (Callable, optional): Custom state-to-scale function.
         cov_fn (Callable, optional): Custom state-to-cov function.
-        default (str, optional): Default method to inherit from if custom functions
-            are not provided.
+        default (CurvApprox, optional): Default method to inherit from if custom
+            functions are not provided.
 
     Raises:
         ValueError: If neither a default method is provided nor all required
@@ -325,7 +376,7 @@ def register_curvature_method(
         ]
         msg = (
             "Either a default method must be provided or the following functions must "
-            f"be specified: {', '.join(missing_functions)}."
+            f'be specified: {", ".join(missing_functions)}.'
         )
         raise ValueError(msg)
 

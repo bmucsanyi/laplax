@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from laplax import util
-from laplax.types import PyTree
+from laplax.types import Array, Layout, PyTree
 from laplax.util.flatten import unravel_array_into_pytree
 from laplax.util.ops import lmap
 from laplax.util.tree import (
@@ -17,9 +17,7 @@ from laplax.util.tree import (
 )
 
 
-def diagonal(
-    mv: Callable | jnp.ndarray, layout: int | PyTree | None = None
-) -> jax.Array:
+def diagonal(mv: Callable | jnp.ndarray, layout: Layout | None = None) -> Array:
     """Return the diagonal of a PyTree-based matrix-vector-product.
 
     Args:
@@ -31,7 +29,7 @@ def diagonal(
     Returns:
         jax.Array: Diagonal of the matrix-free matrix.
     """
-    if isinstance(mv, Callable) and not isinstance(layout, int | PyTree):
+    if isinstance(mv, Callable) and not isinstance(layout, Layout):
         msg = "Either size or tree needs to be present."
         raise TypeError(msg)
 
@@ -60,7 +58,7 @@ def diagonal(
     ])
 
 
-def todense(mv: Callable, layout: PyTree | int, **kwargs) -> jax.Array:
+def todense(mv: Callable, layout: Layout, **kwargs) -> Array:
     """Return a dense matrix representation of a matrix-vector product function.
 
     Args:

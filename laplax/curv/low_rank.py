@@ -11,17 +11,49 @@ compilation when required.
 """
 
 import warnings
+from dataclasses import dataclass
 
 import jax
 import jax.numpy as jnp
 
 from laplax.curv.lanczos import lobpcg_standard
-from laplax.types import Callable, DType, KeyType
+from laplax.types import Array, Callable, DType, KeyType, Num
 from laplax.util.flatten import wrap_function
+
+# -----------------------------------------------------------------------------
+# Low-rank terms
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class LowRankTerms:
+    """Dataclass containing the components of the low-rank curvature approximation.
+
+    Attributes:
+        U: The eigenvectors matrix.
+        S: The eigenvalues array.
+        scalar: The scalar factor.
+    """
+
+    U: Num[Array, "P R"]  # noqa: F722
+    S: Num[Array, "R"]  # noqa: F821
+    scalar: float
+
+
+jax.tree_util.register_pytree_node(
+    LowRankTerms,
+    lambda node: ((node.U, node.S, node.scalar), None),
+    lambda _, children: LowRankTerms(U=children[0], S=children[1], scalar=children[2]),
+)
+
+
+# -----------------------------------------------------------------------------
+# Low-rank approximation
+# -----------------------------------------------------------------------------
 
 
 def get_low_rank_approximation(
-    mv: Callable[[jax.Array], jax.Array],
+    mv: Callable[[Array], Array],
     key: KeyType,
     size: int,
     maxiter: int = 20,
@@ -32,7 +64,7 @@ def get_low_rank_approximation(
     *,
     mv_jittable: bool = True,
     **kwargs,
-) -> dict:
+) -> LowRankTerms:
     """Computes a low-rank approximation using the LOBPCG algorithm.
 
     This function computes the leading eigenvalues and eigenvectors of a matrix
@@ -61,7 +93,7 @@ def get_low_rank_approximation(
         **kwargs: Not needed.
 
     Returns:
-        dict: A dictionary containing:
+        LowRankTerms: A dataclass containing:
             - "U" (jax.Array): Eigenvectors as a matrix of shape `(size, maxiter)`.
             - "S" (jax.Array): Corresponding eigenvalues as a vector of length
                 `maxiter`.
@@ -100,17 +132,12 @@ def get_low_rank_approximation(
         A_jittable=mv_jittable,
     )
 
-    # Prepare the results
-    low_rank_result = {
-        "U": jnp.asarray(eigenvecs, dtype=calc_dtype),
-        "S": jnp.asarray(eigenvals, dtype=calc_dtype),
-    }
-
-    # Convert back to the requested output dtype if needed
-    if return_dtype != calc_dtype:
-        low_rank_result = jax.tree.map(
-            lambda x: x.astype(return_dtype), low_rank_result
-        )
+    # Prepare and convert the results
+    low_rank_result = LowRankTerms(
+        U=jnp.asarray(eigenvecs, dtype=return_dtype),
+        S=jnp.asarray(eigenvals, dtype=return_dtype),
+        scalar=0.0,
+    )
 
     # Restore the original configuration dtype
     if is_compute_in_float64 != jax.config.read("jax_enable_x64"):

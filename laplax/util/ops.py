@@ -6,6 +6,8 @@ import os
 import jax
 import jax.numpy as jnp
 
+from laplax.types import Any, Callable, DType, Iterable
+
 # -------------------------------------------------------------------------
 # Default values
 # -------------------------------------------------------------------------
@@ -48,7 +50,7 @@ def get_env_bool(key: str, default: str) -> bool:
 # -------------------------------------------------------------------------
 
 
-def lmap(func, data, batch_size: int | str | None = None):
+def lmap(func: Callable, data: Iterable, batch_size: int | str | None = None) -> Any:
     """Support for `jax.lax.map` with flexible batch sizes.
 
     Args:
@@ -69,13 +71,15 @@ def lmap(func, data, batch_size: int | str | None = None):
     return jax.lax.map(func, data, batch_size=batch_size)
 
 
-def laplax_dtype():
+def laplax_dtype() -> DType:
     """Returns the dtype specified by the environment or the default dtype."""
     dtype = get_env_value("LAPLAX_DTYPE", DEFAULT_DTYPE)
     return jnp.dtype(dtype)
 
 
-def precompute_list(func, items, option: str | bool | None = None, **kwargs):
+def precompute_list(
+    func: Callable, items: Iterable, option: str | bool | None = None, **kwargs
+) -> Callable:
     """Precomputes a list of operations or returns the original function.
 
     Args:

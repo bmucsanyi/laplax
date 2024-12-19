@@ -1,13 +1,11 @@
 from collections import OrderedDict
 
-import jax
-
-from laplax.types import Callable
+from laplax.types import Array, Callable, Data, InputArray
 from laplax.util.ops import lmap
 from laplax.util.utils import identity
 
 
-def finalize_functions(functions: OrderedDict, results: dict, **kwargs):
+def finalize_functions(functions: OrderedDict, results: dict[str, Array], **kwargs):
     """Finalize functions.
 
     Scans over ordered dictionary of functions (metrics, pushforwards, ...) and fills
@@ -18,7 +16,9 @@ def finalize_functions(functions: OrderedDict, results: dict, **kwargs):
     return results
 
 
-def evaluate_on_dataset(pred_fn: Callable, data: tuple[jax.Array], **kwargs) -> dict:
+def evaluate_on_dataset(
+    pred_fn: Callable[[InputArray], dict[str, Array]], data: Data, **kwargs
+) -> dict:
     """Evaluate prob_predictive on dataset.
 
     Args:
@@ -31,15 +31,15 @@ def evaluate_on_dataset(pred_fn: Callable, data: tuple[jax.Array], **kwargs) -> 
         A dictionary containing predictions.
     """
 
-    def evaluate_data_point(dp: tuple[jax.Array]) -> dict:
+    def evaluate_data_point(dp: Data) -> dict[str, Array]:
         return {**pred_fn(dp["input"]), "target": dp["target"]}
 
     return lmap(evaluate_data_point, data, batch_size=kwargs.get("lmap_eval", "data"))
 
 
 def evaluate_metrics_on_dataset(
-    pred_fn: Callable,
-    data: tuple[jax.Array],
+    pred_fn: Callable[[InputArray], dict[str, Array]],
+    data: Data,
     *,
     metrics: OrderedDict[Callable],
     apply: Callable = identity,
@@ -59,7 +59,7 @@ def evaluate_metrics_on_dataset(
 
     """
 
-    def evaluate_data_point(dp: tuple[jax.Array]) -> dict:
+    def evaluate_data_point(dp: Data) -> dict[str, Array]:
         pred = {**pred_fn(dp["input"]), "target": dp["target"]}
         return finalize_functions(functions=metrics, results={}, **pred)
 
