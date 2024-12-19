@@ -14,10 +14,10 @@ from laplax.types import (
     Callable,
     CurvatureMV,
     FlatParams,
-    Float,
     Layout,
     Num,
     PosteriorState,
+    PriorArguments,
     PyTree,
 )
 from laplax.util.flatten import (
@@ -45,10 +45,9 @@ def create_full_curvature(
 
 def full_with_prior(
     curv_est: Num[Array, "P P"],  # noqa: F722
-    prior_prec: Float,
-    **kwargs,
+    prior_arguments: PriorArguments,
 ) -> Num[Array, "P P"]:  # noqa: F722
-    del kwargs
+    prior_prec = prior_arguments["prior_prec"]
     return curv_est + prior_prec * jnp.eye(curv_est.shape[-1])
 
 
@@ -109,8 +108,10 @@ def create_diagonal_curvature(mv: CurvatureMV, layout: Layout, **kwargs) -> Flat
     return curv_diagonal
 
 
-def diag_with_prior(curv_est: FlatParams, prior_prec: Float, **kwargs) -> FlatParams:
-    del kwargs
+def diag_with_prior(
+    curv_est: FlatParams, prior_arguments: PriorArguments
+) -> FlatParams:
+    prior_prec = prior_arguments["prior_prec"]
     return curv_est + prior_prec * jnp.ones_like(curv_est.shape[-1])
 
 
@@ -182,9 +183,9 @@ def low_rank_square(state: LowRankTerms) -> LowRankTerms:
 
 
 def low_rank_with_prior(
-    curv_est: LowRankTerms, prior_prec: Float, **kwargs
+    curv_est: LowRankTerms, prior_arguments: PriorArguments
 ) -> LowRankTerms:
-    del kwargs
+    prior_prec = prior_arguments["prior_prec"]
     curv_est.scalar = prior_prec
     return curv_est
 
@@ -217,30 +218,33 @@ def low_rank_state_to_cov(
 # General api
 # ---------------------------------------------------------------------------------
 
-CURVATURE_METHODS: dict[CurvApprox | str, Callable] = {
+CurvatureKeyType = CurvApprox | str | None
+
+CURVATURE_METHODS: dict[CurvatureKeyType, Callable] = {
     CurvApprox.FULL: create_full_curvature,
     CurvApprox.DIAGONAL: create_diagonal_curvature,
     CurvApprox.LOW_RANK: create_low_rank_curvature,
 }
 
-CURVATURE_PRIOR_METHODS: dict[CurvApprox | str, Callable] = {
+CURVATURE_PRIOR_METHODS: dict[CurvatureKeyType, Callable] = {
     CurvApprox.FULL: full_with_prior,
     CurvApprox.DIAGONAL: diag_with_prior,
     CurvApprox.LOW_RANK: low_rank_with_prior,
 }
-CURVATURE_TO_POSTERIOR_STATE: dict[CurvApprox | str, Callable] = {
+
+CURVATURE_TO_POSTERIOR_STATE: dict[CurvatureKeyType, Callable] = {
     CurvApprox.FULL: full_prec_to_state,
     CurvApprox.DIAGONAL: diag_prec_to_state,
     CurvApprox.LOW_RANK: low_rank_prec_to_state,
 }
 
-CURVATURE_STATE_TO_SCALE: dict[CurvApprox | str, Callable] = {
+CURVATURE_STATE_TO_SCALE: dict[CurvatureKeyType, Callable] = {
     CurvApprox.FULL: full_state_to_scale,
     CurvApprox.DIAGONAL: diag_state_to_scale,
     CurvApprox.LOW_RANK: low_rank_state_to_scale,
 }
 
-CURVATURE_STATE_TO_COV: dict[CurvApprox | str, Callable] = {
+CURVATURE_STATE_TO_COV: dict[CurvatureKeyType, Callable] = {
     CurvApprox.FULL: full_state_to_cov,
     CurvApprox.DIAGONAL: diag_state_to_cov,
     CurvApprox.LOW_RANK: low_rank_state_to_cov,
@@ -250,12 +254,12 @@ CURVATURE_STATE_TO_COV: dict[CurvApprox | str, Callable] = {
 @dataclass
 class Posterior:
     state: PosteriorState
-    cov_mv: Callable[[FlatParams], FlatParams]
-    scale_mv: Callable[[FlatParams], FlatParams]
+    cov_mv: Callable[[PosteriorState], Callable[[FlatParams], FlatParams]]
+    scale_mv: Callable[[PosteriorState], Callable[[FlatParams], FlatParams]]
 
 
 def create_posterior_function(
-    curvature_type: CurvApprox | str,  # str is for user-specified methods.
+    curvature_type: CurvApprox | str,
     mv: CurvatureMV,
     layout: Layout | None = None,
     **kwargs,
@@ -290,12 +294,11 @@ def create_posterior_function(
     # Retrieve the curvature estimator based on the provided type
     curv_estimator = CURVATURE_METHODS[curvature_type](mv, layout=layout, **kwargs)
 
-    def posterior_function(**posterior_kwargs) -> PosteriorState:
+    def posterior_function(prior_arguments: PriorArguments) -> PosteriorState:
         """Posterior function to compute covariance and scale-related functions.
 
         Parameters:
-            **posterior_kwargs: Additional arguments required for posterior
-                computations.
+            prior_arguments (PriorArguments): Prior arguments for the posterior.
 
         Returns:
             PosteriorState: Dictionary containing:
@@ -305,7 +308,7 @@ def create_posterior_function(
         """
         # Calculate posterior precision.
         precision = CURVATURE_PRIOR_METHODS[curvature_type](
-            curv_est=curv_estimator, **posterior_kwargs
+            curv_est=curv_estimator, prior_arguments=prior_arguments
         )
 
         # Calculate posterior state
@@ -380,10 +383,10 @@ def register_curvature_method(
         )
         raise ValueError(msg)
 
-    CURVATURE_METHODS[name] = create_fn or CURVATURE_METHODS[default]  # type: ignore[reportArgumentType]
-    CURVATURE_PRIOR_METHODS[name] = prior_fn or CURVATURE_PRIOR_METHODS[default]  # type: ignore[reportArgumentType]
+    CURVATURE_METHODS[name] = create_fn or CURVATURE_METHODS[default]
+    CURVATURE_PRIOR_METHODS[name] = prior_fn or CURVATURE_PRIOR_METHODS[default]
     CURVATURE_TO_POSTERIOR_STATE[name] = (
-        posterior_fn or CURVATURE_TO_POSTERIOR_STATE[default]  # type: ignore[reportArgumentType]
+        posterior_fn or CURVATURE_TO_POSTERIOR_STATE[default]
     )
-    CURVATURE_STATE_TO_SCALE[name] = scale_fn or CURVATURE_STATE_TO_SCALE[default]  # type: ignore[reportArgumentType]
-    CURVATURE_STATE_TO_COV[name] = cov_fn or CURVATURE_STATE_TO_COV[default]  # type: ignore[reportArgumentType]
+    CURVATURE_STATE_TO_SCALE[name] = scale_fn or CURVATURE_STATE_TO_SCALE[default]
+    CURVATURE_STATE_TO_COV[name] = cov_fn or CURVATURE_STATE_TO_COV[default]

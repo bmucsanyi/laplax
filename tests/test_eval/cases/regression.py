@@ -110,7 +110,7 @@ class NNXRegressionTask(BaseRegressionTask):
 
     def get_model_fn(self):
         def model_fn(input, params):
-            return nnx.call((self.graph_def, params))(input)
+            return nnx.call((self.graph_def, params))(input)[0]
 
         return model_fn
 

@@ -242,7 +242,7 @@ def set_lin_pushforward(
     **kwargs,
 ) -> Callable:
     # Create posterior state
-    posterior_state = posterior(**prior_arguments)
+    posterior_state = posterior(prior_arguments)
 
     # Create pushforward functions
     def pf_jvp(input: InputArray, vector: Params) -> PredArray:
@@ -296,7 +296,7 @@ def set_lin_pushforward(
 def set_posterior_gp_kernel(
     model_fn: ModelFn,
     mean: Params,
-    posterior: Callable[..., PosteriorState],
+    posterior: Callable[..., Posterior],
     prior_arguments: PriorArguments,
     **kwargs,
 ) -> Callable:
@@ -314,9 +314,9 @@ def set_posterior_gp_kernel(
     Returns:
         Callable: A function that computes the posterior GP kernel between two inputs.
     """
-    # Create posterior state and covariance
-    posterior_state = posterior(**prior_arguments)
-    cov_mv = posterior_state.cov_mv(posterior_state.state)
+    # Create posterior collection containing state, cov_mv and scale_mv.
+    posterior_collection = posterior(prior_arguments)
+    cov_mv = posterior_collection.cov_mv(posterior_collection.state)
 
     # Pushforward functions
     def pf_jvp(input: InputArray, vector: Params) -> PredArray:

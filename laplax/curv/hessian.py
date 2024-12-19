@@ -71,10 +71,10 @@ def create_hessian_mv_without_data(
 ) -> Callable[[Params, Data], Params]:
     del kwargs
 
-    _model_fn: Callable[[InputArray, TargetArray, Params], Num[Array, "..."]]  # noqa: UP037
+    new_model_fn: Callable[[InputArray, TargetArray, Params], Num[Array, "..."]]  # noqa: UP037
 
     if loss_fn is not None:
-        _model_fn = concatenate_model_and_loss_fn(
+        new_model_fn = concatenate_model_and_loss_fn(
             model_fn, loss_fn, has_batch=has_batch
         )
     else:
@@ -85,11 +85,11 @@ def create_hessian_mv_without_data(
             del target  # Ignore target since there's no loss
             return model_fn(input, params)
 
-        _model_fn = model_without_loss
+        new_model_fn = model_without_loss
 
     def _hessian_mv(vector: Params, data: Data) -> Params:
         return hvp(
-            lambda p: _model_fn(data["input"], data["target"], p),
+            lambda p: new_model_fn(data["input"], data["target"], p),
             params,
             vector,
         )

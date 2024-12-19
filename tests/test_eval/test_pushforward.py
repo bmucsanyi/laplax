@@ -51,7 +51,7 @@ def test_mc_pushforward(curv_op, task):
     results = jax.vmap(pushforward)(data["input"])
 
     # # Check results
-    pred = jax.vmap(lambda x: model_fn(params, x))(data["input"])
+    pred = jax.vmap(lambda x: model_fn(input=x, params=params))(data["input"])
     assert (5, task.out_channels) == results["samples"].shape[1:]  # Check shape
     assert jnp.all(results["pred_std"] >= 0)
     assert jnp.allclose(pred, results["pred"])
@@ -92,7 +92,7 @@ def test_lin_pushforward(curv_op, task):
     results = jax.vmap(pushforward)(data["input"])
 
     # Check results
-    pred = jax.vmap(lambda x: model_fn(params, x))(data["input"])
+    pred = jax.vmap(lambda x: model_fn(input=x, params=params))(data["input"])
     assert (5, task.out_channels) == results["samples"].shape[
         1:
     ]  # (batch, samples, out)
