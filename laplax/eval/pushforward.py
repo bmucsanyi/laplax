@@ -132,7 +132,7 @@ def set_mc_pushforward(
     **kwargs,
 ) -> Callable[[InputArray], dict[str, Array]]:
     # Create weight sample function
-    posterior_state = posterior(**prior_arguments)
+    posterior_state = posterior(prior_arguments)
     scale_mv = posterior_state.scale_mv(posterior_state.state)
 
     get_weight_sample = set_get_weight_sample(
@@ -236,7 +236,7 @@ def set_lin_pushforward(
     key: KeyType,
     model_fn: ModelFn,
     mean: Params,
-    posterior: Callable[[PriorArguments], PosteriorState],
+    posterior: Callable[..., PosteriorState],
     prior_arguments: PriorArguments,
     pushforward_functions: OrderedDict = DEFAULT_LIN_FINALIZE,
     **kwargs,
@@ -296,7 +296,7 @@ def set_lin_pushforward(
 def set_posterior_gp_kernel(
     model_fn: ModelFn,
     mean: Params,
-    posterior: Callable[[PriorArguments], PosteriorState],
+    posterior: Callable[..., PosteriorState],
     prior_arguments: PriorArguments,
     **kwargs,
 ) -> Callable:

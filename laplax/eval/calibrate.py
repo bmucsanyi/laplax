@@ -48,7 +48,7 @@ def grid_search(
     for iteration, prior_prec in enumerate(prior_prec_interval):
         start_time = time.perf_counter()
         try:
-            result = objective(prior_arguments={"prior_prec": prior_prec})
+            result = objective({"prior_prec": prior_prec})
         except ValueError as error:
             logging.warning("Caught an exception in validate: %s", error)
             result = float("inf")

@@ -5,7 +5,9 @@ from laplax.util.ops import lmap
 from laplax.util.utils import identity
 
 
-def finalize_functions(functions: OrderedDict, results: dict[str, Array], **kwargs):
+def finalize_functions(
+    functions: OrderedDict[str, Callable], results: dict[str, Array], **kwargs
+):
     """Finalize functions.
 
     Scans over ordered dictionary of functions (metrics, pushforwards, ...) and fills
@@ -41,7 +43,7 @@ def evaluate_metrics_on_dataset(
     pred_fn: Callable[[InputArray], dict[str, Array]],
     data: Data,
     *,
-    metrics: OrderedDict[Callable],
+    metrics: OrderedDict[str, Callable],
     apply: Callable = identity,
     **kwargs,
 ) -> dict:
