@@ -5,12 +5,14 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
+from laplax.types import Array, Float
+
 # --------------------------------------------------------------------------------
 # Classification metrics
 # --------------------------------------------------------------------------------
 
 
-def correctness(pred: jax.Array, target: jax.Array) -> jax.Array:
+def correctness(pred: Array, target: Array) -> Array:
     """Compute whether each target label is the top-1 prediction of the output.
 
     If target is a 2D array, its argmax is taken before the calculation.
@@ -23,9 +25,7 @@ def correctness(pred: jax.Array, target: jax.Array) -> jax.Array:
     return pred == target
 
 
-def accuracy(
-    pred: jax.Array, target: jax.Array, top_k: tuple[int] = (1,)
-) -> list[jax.Array]:
+def accuracy(pred: Array, target: Array, top_k: tuple[int] = (1,)) -> list[Array]:
     """Compute the accuracy over the k top predictions for the specified values of k.
 
     If target is a 2D array, its argmax is taken before the calculation.
@@ -49,13 +49,13 @@ def accuracy(
     ]
 
 
-def cross_entropy(prob_p: jax.Array, prob_q: jax.Array, axis: int = -1) -> jax.Array:
+def cross_entropy(prob_p: Array, prob_q: Array, axis: int = -1) -> Array:
     p_log_q = jax.scipy.special.xlogy(prob_p, prob_q)
 
     return -p_log_q.sum(axis=axis)
 
 
-def multiclass_brier(prob: jax.Array, target: jax.Array) -> jax.Array:
+def multiclass_brier(prob: Array, target: Array) -> Array:
     if target.ndim == 1:
         target = jax.nn.one_hot(target, num_classes=prob.shape[-1])
 
@@ -66,10 +66,10 @@ def multiclass_brier(prob: jax.Array, target: jax.Array) -> jax.Array:
 
 
 def calculate_bin_metrics(
-    confidence: jax.Array,
-    correctness: jax.Array,
+    confidence: Array,
+    correctness: Array,
     num_bins: int = 15,
-) -> tuple[jax.Array, jax.Array, jax.Array]:
+) -> tuple[Array, Array, Array]:
     """Calculate the binwise accuracies, confidences and proportions of samples.
 
     Args:
@@ -115,36 +115,36 @@ def calculate_bin_metrics(
 
 
 def estimate_q(
-    pred_mean: jnp.ndarray,
-    pred_std: jnp.ndarray,
-    target: jnp.ndarray,
+    pred_mean: Array,
+    pred_std: Array,
+    target: Array,
     **kwargs,
-) -> float:
+) -> Float:
     """Estimate the q value."""
     del kwargs
     return jnp.mean(jnp.power(pred_mean - target, 2) / jnp.power(pred_std, 2))
 
 
-def estimate_rmse(pred_mean: jax.Array, target: jax.Array, **kwargs) -> float:
+def estimate_rmse(pred_mean: Array, target: Array, **kwargs) -> Float:
     """Estimate the 'ensemble' RMSE with pred_mean and target."""
     del kwargs
     return jnp.sqrt(jnp.mean(jnp.power(pred_mean - target, 2)))
 
 
-def estimate_true_rmse(pred: jax.Array, target: jax.Array, **kwargs) -> float:
+def estimate_true_rmse(pred: Array, target: Array, **kwargs) -> Float:
     """Estimate the 'true' RMSE with pred and target."""
     del kwargs
     return jnp.sqrt(jnp.mean(jnp.power(pred - target, 2)))
 
 
 def nll_gaussian(
-    pred: jnp.ndarray,
-    pred_std: jnp.ndarray,
-    target: jnp.ndarray,
+    pred: Array,
+    pred_std: Array,
+    target: Array,
     *,
     scaled: bool = True,
     **kwargs,
-) -> float:
+) -> Float:
     """Negative log likelihood for a Gaussian distribution in JAX.
 
     The negative log likelihood for held out data (y_true) given predictive

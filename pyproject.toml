@@ -44,6 +44,21 @@ dev = [
     "equinox",
     "matplotlib",
 ]
+notebooks = [
+    "tensorflow",
+    "optax",
+    "flax",
+]
+
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings",
+    "mknotebooks",
+    "pytkdocs-tweaks",
+    "mkdocs-autorefs",
+    "mkdocs-search",
+]
 
 # PEP 518 Build System Configuration
 # See https://peps.python.org/pep-0518/

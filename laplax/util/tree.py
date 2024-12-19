@@ -8,7 +8,7 @@ from itertools import starmap
 import jax
 import jax.numpy as jnp
 
-from laplax.types import KeyType, PyTree
+from laplax.types import Any, Array, Float, KeyType, PyTree
 from laplax.util.flatten import unravel_array_into_pytree
 from laplax.util.ops import lmap
 
@@ -31,7 +31,7 @@ def ones_like(tree: PyTree) -> PyTree:
     return jax.tree.map(jnp.ones_like, tree)
 
 
-def zeros_like(tree: PyTree):
+def zeros_like(tree: PyTree) -> PyTree:
     return jax.tree.map(jnp.zeros_like, tree)
 
 
@@ -106,7 +106,7 @@ def tree_slice(tree: PyTree, a: int, b: int) -> PyTree:
     return jax.tree.map(operator.itemgetter(slice(a, b)), tree)
 
 
-def tree_vec_get(tree: PyTree, idx: int) -> any:
+def tree_vec_get(tree: PyTree, idx: int) -> Any:
     if isinstance(tree, jnp.ndarray):
         return tree[idx]  # Also works with arrays.
     # Column flat and get index
@@ -130,6 +130,10 @@ def neg(tree: PyTree) -> PyTree:
 
 def sub(tree1: PyTree, tree2: PyTree) -> PyTree:
     return add(tree1, neg(tree2))
+
+
+def mul(scalar: Float, tree: PyTree) -> PyTree:
+    return jax.tree.map(lambda x: scalar * x, tree)
 
 
 def sqrt(tree: PyTree) -> PyTree:
@@ -156,7 +160,7 @@ def cov(tree: PyTree, **kwargs) -> PyTree:
     return jax.tree.map(partial(jnp.cov, **kwargs), tree)
 
 
-def tree_matvec(tree: PyTree, vector: jax.Array) -> PyTree:
+def tree_matvec(tree: PyTree, vector: Array) -> PyTree:
     # Flatten the vector
     vec_flatten, vec_def = jax.tree.flatten(vector)
     n_vec_flatten = len(vec_flatten)
@@ -182,7 +186,7 @@ def tree_matvec(tree: PyTree, vector: jax.Array) -> PyTree:
     return jax.tree.map(lambda p: p @ vec_flatten, tree)
 
 
-def tree_partialmatvec(tree: PyTree, vector: jax.Array) -> PyTree:
+def tree_partialmatvec(tree: PyTree, vector: Array) -> PyTree:
     return jax.tree.map(lambda arr: arr @ vector, tree)
 
 

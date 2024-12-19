@@ -6,6 +6,7 @@ import pytest_cases
 
 from laplax.curv.cov import create_posterior_function
 from laplax.curv.ggn import create_ggn_mv
+from laplax.enums import CurvApprox
 from laplax.eval.pushforward import set_lin_pushforward, set_mc_pushforward
 
 from .cases.regression import case_regression
@@ -17,7 +18,7 @@ DEFAULT_CASE_LIST = [case_regression]
 
 @pytest_cases.parametrize(
     "curv_op",
-    ["full", "diagonal", "low_rank"],
+    [CurvApprox.FULL, CurvApprox.DIAGONAL, CurvApprox.LOW_RANK],
 )
 @pytest_cases.parametrize_with_cases("task", cases=DEFAULT_CASE_LIST)
 def test_mc_pushforward(curv_op, task):
@@ -58,7 +59,7 @@ def test_mc_pushforward(curv_op, task):
 
 @pytest_cases.parametrize(
     "curv_op",
-    ["full", "diagonal", "low_rank"],
+    [CurvApprox.FULL, CurvApprox.DIAGONAL, CurvApprox.LOW_RANK],
 )
 @pytest_cases.parametrize_with_cases("task", cases=DEFAULT_CASE_LIST)
 def test_lin_pushforward(curv_op, task):
