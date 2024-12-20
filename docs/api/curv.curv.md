@@ -25,7 +25,7 @@ The `laplax.curv.ggn` module provides efficient implementations of Generalized G
 
 ## Hessian
 
-The `laplax.curv.hessian` module provides an implementation of the neural network weight space hessian-vector product.
+The `laplax.curv.hessian` module provides an implementation of the neural network weight space Hessian-vector product.
 
 ::: laplax.curv.hessian.create_hessian_mv
     options:
