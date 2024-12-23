@@ -43,6 +43,18 @@ nav:
       - General: api/curv.md
       - Curvature: api/curv.curv.md
       - Approximations: api/curv.curv_approx.md
+    - laplax.eval:
+      - General: api/eval.md
+      - Metrics: api/eval.metrics.md
+      - Pushforward: api/eval.pushforward.md
+      - Calibrate: api/eval.calibrate.md
+    - laplax.util:
+      - General: api/util.md
+      - Flatten: api/util.flatten.md
+      - Ops: api/util.ops.md
+      - Tree: api/util.tree.md
+      - MV: api/util.mv.md
+      - Loader: api/util.loader.md
 plugins:
   - search
   - autorefs
@@ -53,7 +65,10 @@ plugins:
             - import pytkdocs_tweaks
             - pytkdocs_tweaks.main()
           options:
-            show_signature: false # Whether to show the full function signature
+            show_root_heading: true
+            #show_source: true
+            members_order: source
+            show_signature: true # Whether to show the full function signature
             separate_signature: true # Is not working; should separate function and signature to extra line.
             show_signature_annotations: true
             signature_crossrefs: true
@@ -61,6 +76,7 @@ plugins:
             docstring_style: "google"
             signature_style: "css"
             css_dir: "docs/css"
+            heading_level: 4
 
 
   - mknotebooks:

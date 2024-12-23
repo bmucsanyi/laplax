@@ -35,8 +35,21 @@ from laplax.util.mv import diagonal, todense
 
 def create_full_curvature(
     mv: CurvatureMV, layout: Layout, **kwargs
-) -> Num[Array, "P P"]:  # noqa: F722
-    """Generate a full curvature approximation."""
+) -> Num[Array, "P P"]:
+    """Generate a full curvature approximation.
+
+    The curvature is densed and flattened into a 2D array, that corresponds to the
+    flattened parameter layout.
+
+    Args:
+        mv: Matrix-vector product function representing the curvature.
+        layout: Structure defining the parameter layout that is assumed by the
+            matrix-vector product function.
+        **kwargs: Additional arguments (unused).
+
+    Returns:
+        A dense matrix representing the full curvature approximation.
+    """
     del kwargs
     curv_est = todense(mv, layout=layout)
     flatten_partial_tree, _ = create_partial_pytree_flattener(curv_est)
@@ -44,17 +57,40 @@ def create_full_curvature(
 
 
 def full_with_prior(
-    curv_est: Num[Array, "P P"],  # noqa: F722
+    curv_est: Num[Array, "P P"],
     prior_arguments: PriorArguments,
-) -> Num[Array, "P P"]:  # noqa: F722
+) -> Num[Array, "P P"]:
+    """Add prior precision to the curvature estimate.
+
+    The prior precision (of an isotropic Gaussian prior) is read of the prior_arguments
+    dictionary and added to the curvature estimate.
+
+    Args:
+        curv_est: Full curvature estimate matrix.
+        prior_arguments: Dictionary containing prior precision as 'prior_prec'.
+
+    Returns:
+        Updated curvature matrix with added prior precision.
+    """
     prior_prec = prior_arguments["prior_prec"]
     return curv_est + prior_prec * jnp.eye(curv_est.shape[-1])
 
 
-def prec_to_scale(prec: Num[Array, "P P"]) -> Num[Array, "P P"]:  # noqa: F722
-    """Implementation of the corresponding torch function.
+def prec_to_scale(prec: Num[Array, "P P"]) -> Num[Array, "P P"]:
+    """Convert precision matrix to scale matrix using Cholesky decomposition.
 
+    Implementation of the corresponding torch function for converting a precision
+    matrix to a scale lower triangular matrix.
     See: torch.distributions.multivariate_normal._precision_to_scale_tril.
+
+    Args:
+        prec: Precision matrix to convert.
+
+    Returns:
+        Scale matrix L where L @ L.T is the covariance matrix.
+
+    Raises:
+        ValueError: If the precision matrix is not positive definite.
     """
     Lf = jnp.linalg.cholesky(jnp.flip(prec, axis=(-2, -1)))
 
@@ -69,16 +105,41 @@ def prec_to_scale(prec: Num[Array, "P P"]) -> Num[Array, "P P"]:  # noqa: F722
 
 
 def full_prec_to_state(
-    prec: Num[Array, "P P"],  # noqa: F722
-) -> dict[str, Num[Array, "P P"]]:  # noqa: F722
+    prec: Num[Array, "P P"],
+) -> dict[str, Num[Array, "P P"]]:
+    """Convert precision matrix to scale matrix.
+
+    The provided precision matrix is converted to a scale matrix, which is the lower
+    triangular matrix L such that L @ L.T is the covariance matrix using
+    `prec_to_scale`.
+
+    Args:
+        prec: Precision matrix to convert.
+
+    Returns:
+        Scale matrix L where L @ L.T is the covariance matrix.
+    """
     scale = prec_to_scale(prec)
 
     return {"scale": scale}
 
 
 def full_state_to_scale(
-    state: dict[str, Num[Array, "P P"]],  # noqa: F722
+    state: dict[str, Num[Array, "P P"]],
 ) -> Callable[[FlatParams], FlatParams]:
+    """Create a scale matrix-vector product function.
+
+    The scale matrix is read from the state dictionary and is used to create a
+    corresponding matrix-vector product function representing the action of the scale
+    matrix on a vector.
+
+    Args:
+        state: Dictionary containing the scale matrix.
+
+    Returns:
+        A function that computes the scale matrix-vector product.
+    """
+
     def scale_mv(vec: FlatParams) -> FlatParams:
         return state["scale"] @ vec
 
@@ -86,8 +147,21 @@ def full_state_to_scale(
 
 
 def full_state_to_cov(
-    state: dict[str, Num[Array, "P P"]],  # noqa: F722
+    state: dict[str, Num[Array, "P P"]],
 ) -> Callable[[FlatParams], FlatParams]:
+    """Create a covariance matrix-vector product function.
+
+    The scale matrix is read from the state dictionary and is used to create a
+    corresponding matrix-vector product function representing the action of the cov
+    matrix on a vector. The covariance matrix is computed as the product of the scale
+    matrix and its transpose.
+
+    Args:
+        state: Dictionary containing the scale matrix.
+
+    Returns:
+        A function that computes the covariance matrix-vector product.
+    """
     cov = state["scale"] @ state["scale"].T
 
     def cov_mv(vec: FlatParams) -> FlatParams:
@@ -102,7 +176,20 @@ def full_state_to_cov(
 
 
 def create_diagonal_curvature(mv: CurvatureMV, layout: Layout, **kwargs) -> FlatParams:
-    """Generate a diagonal curvature."""
+    """Generate a diagonal curvature.
+
+    The diagonal of the curvature matrix-vector product is computed as an approximation
+    to the full matrix.
+
+    Args:
+        mv: Matrix-vector product function representing the curvature.
+        layout: Structure defining the parameter layout that is assumed by the
+            matrix-vector product function.
+        **kwargs: Additional arguments (unused).
+
+    Returns:
+        A 1D array representing the diagonal curvature.
+    """
     del kwargs
     curv_diagonal = diagonal(mv, layout=layout)
     return curv_diagonal
@@ -111,17 +198,53 @@ def create_diagonal_curvature(mv: CurvatureMV, layout: Layout, **kwargs) -> Flat
 def diag_with_prior(
     curv_est: FlatParams, prior_arguments: PriorArguments
 ) -> FlatParams:
+    """Add prior precision to the diagonal curvature estimate.
+
+    The prior precision (of an isotropic Gaussian prior) is read of the prior_arguments
+    dictionary and added to the diagonal curvature estimate.
+
+    Args:
+        curv_est: Diagonal curvature estimate.
+        prior_arguments: Dictionary containing prior precision as 'prior_prec'.
+
+    Returns:
+        Updated diagonal curvature with added prior precision.
+    """
     prior_prec = prior_arguments["prior_prec"]
     return curv_est + prior_prec * jnp.ones_like(curv_est.shape[-1])
 
 
 def diag_prec_to_state(prec: FlatParams) -> dict[str, FlatParams]:
+    """Convert precision matrix to scale matrix.
+
+    The provided diagonal precision matrix is converted to the corresponding scale
+    diagonal, which is returned as a PosteriorState dictionary.
+
+    Args:
+        prec: Precision matrix to convert.
+
+    Returns:
+        Scale matrix L where L @ L.T is the covariance matrix.
+    """
     return {"scale": jnp.sqrt(jnp.reciprocal(prec))}
 
 
 def diag_state_to_scale(
     state: dict[str, FlatParams],
 ) -> Callable[[FlatParams], FlatParams]:
+    """Create a scale matrix-vector product function.
+
+    The diagonal scale matrix is read from the state dictionary and is used to create
+    a corresponding matrix-vector product function representing the action of the
+    diagonal scale matrix on a vector.
+
+    Args:
+        state: Dictionary containing the diagonal scale matrix.
+
+    Returns:
+        A function that computes the diagonal scale matrix-vector product.
+    """
+
     def diag_mv(vec: FlatParams) -> FlatParams:
         return state["scale"] * vec
 
@@ -131,6 +254,17 @@ def diag_state_to_scale(
 def diag_state_to_cov(
     state: dict[str, FlatParams],
 ) -> Callable[[FlatParams], FlatParams]:
+    """Create a covariance matrix-vector product function.
+
+    The diagonal covariance matrix is computed as the product of the diagonal scale
+    matrix with itself.
+
+    Args:
+        state: Dictionary containing the diagonal scale matrix.
+
+    Returns:
+        A function that computes the diagonal covariance matrix-vector product.
+    """
     arr = state["scale"] ** 2
 
     def diag_mv(vec: FlatParams) -> FlatParams:
@@ -147,7 +281,20 @@ def diag_state_to_cov(
 def create_low_rank_curvature(
     mv: CurvatureMV, layout: Layout, **kwargs
 ) -> LowRankTerms:
-    """Generate a create_pytree_flattener, low-rank curvature approximations."""
+    """Generate a low-rank curvature approximations.
+
+    The low-rank curvature is computed as an approximation to the full curvature
+    matrix using the provided matrix-vector product function and the LOBPCG algorithm.
+
+    Args:
+        mv: Matrix-vector product function representing the curvature.
+        layout: Structure defining the parameter layout that is assumed by the
+            matrix-vector product function.
+        **kwargs: Additional arguments (unused).
+
+    Returns:
+        A LowRankTerms object representing the low-rank curvature approximation.
+    """
     flatten, unflatten = create_pytree_flattener(layout)
     nparams = util.tree.get_size(layout)
     mv = jax.vmap(
@@ -163,7 +310,22 @@ def create_low_rank_curvature(
 def create_low_rank_mv(
     low_rank_terms: LowRankTerms,
 ) -> Callable[[FlatParams], FlatParams]:
-    """Create a low-rank matrix-vector product."""
+    r"""Create a low-rank matrix-vector product function.
+
+    The low-rank matrix-vector product is computed as the sum of the scalar multiple
+    of the vector by the scalar and the product of the matrix-vector product of the
+    eigenvectors and the eigenvalues times the eigenvector-vector product:
+
+    $$
+    scalar * \text{vec} + U @ (S * (U.T @ \text{vec}))
+    $$
+
+    Args:
+        low_rank_terms: Low-rank curvature approximation.
+
+    Returns:
+        A function that computes the low-rank matrix-vector product.
+    """
     U, S, scalar = jax.tree_util.tree_leaves(low_rank_terms)
 
     def low_rank_mv(vec: FlatParams) -> FlatParams:
@@ -173,6 +335,20 @@ def create_low_rank_mv(
 
 
 def low_rank_square(state: LowRankTerms) -> LowRankTerms:
+    r"""Square the low-rank curvature approximation.
+
+    This returns the LowRankTerms which correspond to the squared low rank
+    approximation.
+
+    $$ (U S U^{\top} + scalar I)**2
+    = scalar**2 + U ((S + scalar) ** 2 - scalar**2) U^{\top} $$
+
+    Args:
+        state: Low-rank curvature approximation.
+
+    Returns:
+        A LowRankTerms object representing the squared low-rank curvature approximation.
+    """
     U, S, scalar = jax.tree_util.tree_leaves(state)
     scalar_sq = scalar**2
     return LowRankTerms(
@@ -185,12 +361,39 @@ def low_rank_square(state: LowRankTerms) -> LowRankTerms:
 def low_rank_with_prior(
     curv_est: LowRankTerms, prior_arguments: PriorArguments
 ) -> LowRankTerms:
+    """Add prior precision to the low-rank curvature estimate.
+
+    The prior precision (of an isotropic Gaussian prior) is read from the
+    `prior_arguments` dictionary and added to the scalar component of the
+    LowRankTerms.
+
+    Args:
+        curv_est: Low-rank curvature approximation.
+        prior_arguments: Dictionary containing prior precision
+            as 'prior_prec'.
+
+    Returns:
+        LowRankTerms: Updated low-rank curvature approximation with added prior
+            precision.
+    """
     prior_prec = prior_arguments["prior_prec"]
     curv_est.scalar = prior_prec
     return curv_est
 
 
 def low_rank_prec_to_state(curv_est: LowRankTerms) -> dict[str, LowRankTerms]:
+    """Convert the low-rank precision representation to a posterior state.
+
+    The scalar component and eigenvalues of the low-rank curvature estimate
+    are transformed to represent the posterior scale, creating again a `LowRankTerms`
+    representation.
+
+    Args:
+        curv_est: Low-rank curvature estimate.
+
+    Returns:
+        A dictionary with the posterior state represented as `LowRankTerms`.
+    """
     U, S, scalar = jax.tree_util.tree_leaves(curv_est)
     scalar_sqrt_inv = jnp.reciprocal(jnp.sqrt(scalar))
     return {
@@ -205,12 +408,36 @@ def low_rank_prec_to_state(curv_est: LowRankTerms) -> dict[str, LowRankTerms]:
 def low_rank_state_to_scale(
     state: dict[str, LowRankTerms],
 ) -> Callable[[FlatParams], FlatParams]:
+    """Create a matrix-vector product function for the scale matrix.
+
+    The state dictionary containing the low-rank representation of the covariance state
+    is used to create a function that computes the matrix-vector product for the scale
+    matrix.
+
+    Args:
+        state: Dictionary containing the low-rank scale.
+
+    Returns:
+        A function that computes the scale matrix-vector product.
+    """
     return create_low_rank_mv(state["scale"])
 
 
 def low_rank_state_to_cov(
     state: dict[str, LowRankTerms],
 ) -> Callable[[FlatParams], FlatParams]:
+    """Create a matrix-vector product function for the covariance matrix.
+
+    The state dictionary containing the low-rank representation of the covariance state
+    is used to create a function that computes the matrix-vector product for the
+    covariance matrix.
+
+    Args:
+        state: Dictionary containing the low-rank scale.
+
+    Returns:
+        A function that computes the covariance matrix-vector product.
+    """
     return create_low_rank_mv(low_rank_square(state["scale"]))
 
 
@@ -264,21 +491,28 @@ def create_posterior_function(
     layout: Layout | None = None,
     **kwargs,
 ) -> Callable:
-    """Factory function to create posterior covariance functions based on curv. type.
+    """Factory function to create the posterior function given a curvature type.
 
-    Parameters:
-        curvature_type (str): Type of curvature approximation ('full', 'diagonal',
+    This sets up the posterior_function which can then be initiated using
+    prior_arguments by computing a specified curvature approximation and encoding the
+    sequential computational order of CURVATURE_PRIOR_METHODS,
+    CURVATURE_TO_POSTERIOR_STATE, CURVATURE_STATE_TO_SCALE, and CURVATURE_STATE_TO_COV.
+    All methods are selected from the corresponding dictionary by the curvature_type
+    argument. New methods can be registered using the register_curvature_method.
+
+    Args:
+        curvature_type: Type of curvature approximation ('full', 'diagonal',
             'low_rank').
-        mv (Callable): Function representing the curvature.
-        **kwargs: Additional parameters required for specific curvature methods,
-            including:
-            - layout (Union[int, None]): Defines the format of the layout
+        mv: Function representing the curvature.
+        layout: Defines the format of the layout
                 for matrix-vector products. If None or an integer, no
                 flattening/unflattening is used.
+        **kwargs: Additional key-word arguments are only passed to the curvature
+            estimation function.
 
     Returns:
-        Callable: A posterior function that calculates posterior covariance and scale
-            functions.
+        Callable: A posterior function that takes the prior_arguments and returns the
+            posterior_state.
     """
     if layout is not None and not isinstance(layout, int | PyTree):
         msg = "Layout must be an integer, PyTree or None."
@@ -298,7 +532,7 @@ def create_posterior_function(
         """Posterior function to compute covariance and scale-related functions.
 
         Parameters:
-            prior_arguments (PriorArguments): Prior arguments for the posterior.
+            prior_arguments: Prior arguments for the posterior.
 
         Returns:
             PosteriorState: Dictionary containing:
@@ -346,19 +580,28 @@ def register_curvature_method(
 ) -> None:
     """Register a new curvature method with optional custom functions.
 
-    Parameters:
-        name (str): Name of the new curvature method.
-        create_fn (Callable, optional): Custom curvature creation function.
-        prior_fn (Callable, optional): Custom prior function.
-        posterior_fn (Callable, optional): Custom posterior state function.
-        scale_fn (Callable, optional): Custom state-to-scale function.
-        cov_fn (Callable, optional): Custom state-to-cov function.
-        default (CurvApprox, optional): Default method to inherit from if custom
-            functions are not provided.
+    This function allows adding new curvature methods with their corresponding
+    functions for creating curvature estimates, adding prior information,
+    computing posterior states, and deriving matrix-vector product functions
+    for scale and covariance.
+
+    Args:
+        name: Name of the new curvature method.
+        create_fn: Custom function to create the curvature
+            estimate. Defaults to None.
+        prior_fn: Custom function to incorporate prior
+            information. Defaults to None.
+        posterior_fn: Custom function to compute posterior
+            states. Defaults to None.
+        scale_fn: Custom function to compute scale
+            matrix-vector products. Defaults to None.
+        cov_fn: Custom function to compute covariance
+            matrix-vector products. Defaults to None.
+        default: Default method to inherit missing
+            functionality from. Defaults to None.
 
     Raises:
-        ValueError: If neither a default method is provided nor all required
-            functions are specified.
+        ValueError: If no default is provided and required functions are missing.
     """
     # Check whether default is given
     if default is None and not all((

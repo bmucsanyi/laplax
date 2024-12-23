@@ -20,4 +20,16 @@ Currently, the following approximations and corresponding weight posteriors are 
 - **Diagonal:** Diagonal approximation of the curvature.
 - **Low Rank** Low-rank approximation of the curvature.
 
-Each method leads to a corresponding weight-space covariance matrix-vector product. Custom curvatures can be easily registered and used in our pipelines.
+Each method leads to a corresponding weight space covariance matrix-vector product. Additional curvature can be easily registered to have the same pipeline available.
+
+## Key functions
+
+All functionalities are summarized in the following function, that takes a curvature-vector-product and returns a function that maps `prior_arguments` to the posterior.
+
+::: laplax.curv.cov.create_posterior_function
+
+## Bonus
+
+Additional curvature approximations/pipelines can be registered with the following function:
+
+::: laplax.curv.cov.register_curvature_method

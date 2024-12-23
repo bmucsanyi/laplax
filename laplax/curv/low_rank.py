@@ -1,13 +1,19 @@
-"""Higher-level API for low_rank approximations.
+"""Higher-level API for Low-Rank Approximations.
 
 This module provides utilities for computing low-rank approximations using
-the Locally Optimal Block Preconditioned Conjugate Gradient (LOBPCG) algorithm
-with mixed-precision support.
+the Locally Optimal Block Preconditioned Conjugate Gradient (LOBPCG) algorithm.
+It supports mixed-precision arithmetic, customizable data types, and optional
+JIT compilation for optimized performance.
 
-The primary function, `get_low_rank_approximation`, computes a low-rank
-approximation of a matrix using a matrix-vector product function. It supports
-customizable data types, tolerance levels, and the ability to disable JIT
-compilation when required.
+The primary function, `get_low_rank_approximation`, computes the leading eigenvalues
+and eigenvectors of a matrix represented by a matrix-vector product function.
+This allows for scalable computation without explicitly constructing the full
+matrix, making it efficient for large-scale problems.
+
+Key Features:
+- Mixed-precision support for reduced memory usage and improved performance.
+- Flexible tolerance and iteration settings for adaptive convergence.
+- JIT compilation for efficient matrix-vector product computations.
 """
 
 import warnings
@@ -27,17 +33,20 @@ from laplax.util.flatten import wrap_function
 
 @dataclass
 class LowRankTerms:
-    """Dataclass containing the components of the low-rank curvature approximation.
+    """Components of the low-rank curvature approximation.
+
+    This dataclass encapsulates the results of the low-rank approximation, including
+    the eigenvectors, eigenvalues, and a scalar factor which can be used for the prior.
 
     Attributes:
-        U: The eigenvectors matrix.
-        S: The eigenvalues array.
-        scalar: The scalar factor.
+        U: Matrix of eigenvectors, where each column corresponds to an eigenvector.
+        S: Array of eigenvalues associated with the eigenvectors.
+        scalar: Scalar factor added to the matrix during the approximation.
     """
 
-    U: Num[Array, "P R"]  # noqa: F722
-    S: Num[Array, "R"]  # noqa: F821
-    scalar: Float[Array, ""]  # noqa: F722
+    U: Num[Array, "P R"]
+    S: Num[Array, " R"]
+    scalar: Float[Array, ""]
 
 
 jax.tree_util.register_pytree_node(
@@ -65,38 +74,62 @@ def get_low_rank_approximation(
     mv_jittable: bool = True,
     **kwargs,
 ) -> LowRankTerms:
-    """Computes a low-rank approximation using the LOBPCG algorithm.
+    r"""Compute a low-rank approximation using the LOBPCG algorithm.
 
     This function computes the leading eigenvalues and eigenvectors of a matrix
-    represented by a matrix-vector product function `mv`. It supports mixed-precision
-    arithmetic and optional JIT compilation.
+    represented by a matrix-vector product function `mv`, without explicitly forming
+    the matrix. It uses the Locally Optimal Block Preconditioned Conjugate Gradient
+    (LOBPCG) algorithm to achieve efficient low-rank approximation, with support
+    for mixed-precision arithmetic and optional JIT compilation.
+
+    Mathematically, the low-rank approximation seeks to find the leading eigenpairs
+    $(\lambda_i, u_i)$ such that:
+    $A u_i = \lambda_i u_i \quad \text{for } i = 1, \ldots, k$, where $A$ is the matrix
+    represented by the matrix-vector product `mv`, and $k$ is the number of eigenpairs.
 
     Args:
-        mv (Callable[[jax.Array], jax.Array]):
-            Matrix-vector product function representing the matrix A(x).
-        key (KeyType):
-            PRNG key for random initialization of search directions.
-        size (int):
-            Dimension of the input/output space.
-        maxiter (int, optional):
-            Maximum number of LOBPCG iterations. Default is 20.
-        mv_dtype (DType, optional):
-            Data type for matrix-vector product calls. Default is float32.
-        calc_dtype (DType, optional):
-            Data type for internal calculations during LOBPCG. Default is float64.
-        return_dtype (DType, optional):
-            Desired output data type for results. Default is float32.
-        tol (float | None, optional):
-            Tolerance for convergence. If None, uses default machine epsilon.
-        mv_jittable (bool, optional):
-            If True, enables JIT compilation for LOBPCG. Default is True.
-        **kwargs: Not needed.
+        mv: A callable that computes the matrix-vector product, representing the matrix
+            $A(x)$.
+        key: PRNG key for random initialization of the search directions.
+        size: Dimension of the input/output space of the matrix.
+        maxiter: Maximum number of LOBPCG iterations. Defaults to 20.
+        mv_dtype: Data type for the matrix-vector product function.
+        calc_dtype: Data type for internal calculations during LOBPCG.
+        return_dtype: Data type for the final results.
+        tol: Convergence tolerance for the algorithm. If `None`, the machine epsilon
+            for `calc_dtype` is used.
+        mv_jittable: If `True`, enables JIT compilation for the matrix-vector product.
+        **kwargs: Additional arguments (ignored).
 
     Returns:
         LowRankTerms: A dataclass containing:
-            - "U" (jax.Array): Eigenvectors as a matrix of shape `(size, maxiter)`.
-            - "S" (jax.Array): Corresponding eigenvalues as a vector of length
-                `maxiter`.
+            - `U`: Eigenvectors as a matrix of shape `(size, rank)`.
+            - `S`: Eigenvalues as an array of length `rank`.
+            - `scalar`: Scalar factor, initialized to 0.0.
+
+    Raises:
+        ValueError: If `size` is insufficient to perform the requested number of
+            iterations.
+
+    Notes:
+        - If the size of the matrix is small relative to `maxiter`, the number of
+          iterations is reduced to avoid over-computation.
+        - Mixed precision can significantly reduce memory usage, especially for large
+          matrices.
+
+    Example:
+        ```python
+        def mv_function(x):
+            return A @ x  # Replace A with your matrix or matrix representation
+
+        low_rank_terms = get_low_rank_approximation(
+            mv=mv_function,
+            key=jax.random.PRNGKey(42),
+            size=1000,
+            maxiter=10,
+            tol=1e-6,
+        )
+        ```
     """
     del kwargs
 

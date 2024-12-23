@@ -159,6 +159,9 @@ ignore = [
     "FBT001",
     "FBT003",
     "TD003",
+    # We allow strings as type annotations, following the recommendations from jaxtyping:
+    #(https://docs.kidger.site/jaxtyping/faq/#flake8-or-ruff-are-throwing-an-error)
+    "F722",
     # It is fine to override loop variables when it is clear that only the value that
     # overrides the original is needed
     "PLW2901",

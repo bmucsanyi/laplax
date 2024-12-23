@@ -28,6 +28,24 @@ from laplax.util.tree import mul
 def _cross_entropy_hessian_mv(
     jv: PredArray, pred: PredArray, **kwargs
 ) -> Num[Array, "..."]:
+    r"""Compute the Hessian-vector product for cross-entropy loss.
+
+    This calculation uses the softmax probabilities of the predictions to compute the
+    diagonal and off-diagonal components of the Hessian. The result is the difference
+    between the diagonal contribution and the off-diagonal contribution of the Hessian.
+
+    Mathematically, the Hessian-vector product is computed as:
+    $H \cdot jv = \text{diag}(p) \cdot jv - p \cdot (p^\top \cdot jv), $ s
+    where $p = \text{softmax}(\text{pred})$.
+
+    Args:
+        jv: Vector to multiply with the Hessian.
+        pred: Model predictions (logits).
+        **kwargs: Additional arguments (ignored).
+
+    Returns:
+        Hessian-vector product for cross-entropy loss.
+    """
     del kwargs
     prob = jax.nn.softmax(pred)
     off_diag_jv = prob * (prob.reshape(1, -1) @ jv)
@@ -36,6 +54,22 @@ def _cross_entropy_hessian_mv(
 
 
 def _mse_hessian_mv(jv: PredArray, **kwargs) -> PredArray:
+    r"""Compute the Hessian-vector product for mean squared error loss.
+
+    The Hessian of the mean squared error loss is a constant diagonal matrix with
+    2 along the diagonal. Thus, the Hessian-vector product is simply 2 times the
+    input vector.
+
+    Mathematically:
+    $H \cdot jv = 2 \cdot jv$.
+
+    Args:
+        jv: Vector to multiply with the Hessian.
+        **kwargs: Additional arguments (ignored).
+
+    Returns:
+        Hessian-vector product for MSE loss.
+    """
     del kwargs
     return 2 * jv
 
@@ -43,32 +77,22 @@ def _mse_hessian_mv(jv: PredArray, **kwargs) -> PredArray:
 def create_loss_hessian_mv(
     loss_fn: LossFn | Callable[[PredArray, TargetArray], Num[Array, "..."]],
 ) -> Callable:
-    """Return the Hessian-vector product for a given loss function.
+    r"""Create a function to compute the Hessian-vector product for a specified loss fn.
 
-    Create a function to compute the Hessian-vector product for a specified loss
-    function.
+    For predefined loss functions like cross-entropy and mean squared error, the
+    function computes their corresponding Hessian-vector products using efficient
+    formulations. For custom loss functions, the Hessian-vector product is computed via
+    automatic differentiation.
 
     Args:
-        loss_fn (str | Callable):
-            The loss function for which the Hessian-vector product is computed.
-            Can be:
-
-            - `"cross_entropy"`: Computes the Hessian-vector product for cross-entropy
-                loss.
-            - `"regression"` or `"mse"`: Computes the Hessian-vector product for mean
-                squared error.
-            - A custom callable loss function that takes predictions and targets as
-                inputs.
+        loss_fn: Loss function to compute the Hessian-vector product for. Supported
+        options are:
+            - "cross_entropy" for cross-entropy loss.
+            - "mse" for mean squared error loss.
+            - A custom callable loss function that takes predictions and targets.
 
     Returns:
-        Callable:
-            A function `loss_hessian_mv(jv, *, pred, target, **kwargs)` that computes
-            the Hessian-vector product for the given loss function. The parameters are:
-            - `jv` (jax.Array): The vector to multiply with the Hessian.
-            - `pred` (jax.Array): The model predictions.
-            - `target` (jax.Array, optional): The target labels (required for custom
-                loss functions).
-            - `**kwargs`: Additional arguments, which are ignored.
+        A function that computes the Hessian-vector product for the given loss function.
     """
     if loss_fn == LossFn.CROSSENTROPY:
         return _cross_entropy_hessian_mv
@@ -106,34 +130,31 @@ def create_ggn_mv_without_data(
     factor: Float = 1.0,
     **kwargs,
 ) -> Callable[[Params, Data], Params]:
-    """GGN-mv function without hardcoded data batch.
+    r"""Create Generalized Gauss-Newton (GGN) matrix-vector productwithout fixed data.
 
-    Create a GGN-mv function that computes the Generalized Gauss-Newton (GGN) matrix-
-    vector product without hardcoding the dataset.
+    The GGN matrix is computed using the Jacobian of the model and the Hessian of the
+    loss function. The resulting product is given by:
+    $\text{factor} \cdot \sum_i J_i^\top H_{L, i} J_i \cdot v$
+    where $J_i$ is the Jacobian of the model at data point $i$, $H_{L, i}$ is the
+    Hessian of the loss, and $v$ is the vector.
 
-    The formula for the GGN-mv is given by:
-
-    $$ J_p^T H_L J_p v $$
+    This function computes the above expression efficiently without hardcoding the
+    dataset, making it suitable for distributed or batched computations.
 
     Args:
-        model_fn (Callable):
-            Forward pass function of the model, which takes `params` and `input` as
-            arguments.
-        params (dict):
-            Model parameters to be passed to `model_fn`.
-        loss_fn (str | Callable):
-            Loss function to be used. Can be a string (e.g., "regression",
-            "cross_entropy") or
-            a callable that computes the loss.
-        factor (float):
-            Factor to scale the GGN-mv by.
-        **kwargs:
-            - lmap_ggn_mv (int, optional): Chunk size for iterating over the data.
+        model_fn: The model's forward pass function.
+        params: Model parameters.
+        loss_fn: Loss function to use for the GGN computation.
+        factor: Scaling factor for the GGN computation.
+        **kwargs: Additional arguments, including:
+            - `lmap_ggn_mv`: Chunk size for iterating over data.
 
     Returns:
-        Callable:
-            A function that takes a vector and a batch of data, then computes the GGN-mv
-            for the specified model and loss function.
+        A function that takes a vector and a batch of data, and computes the GGN
+        matrix-vector product.
+
+    Note:
+        The function assumes that the data has a batch dimension.
     """
 
     def _jvp_fn(
@@ -194,32 +215,32 @@ def create_ggn_mv(
     factor: Float = 1.0,
     **kwargs,
 ) -> Callable[[Params], Params]:
-    """GGN-mv factory function with hardcoded data batch.
+    r"""Computes the Generalized Gauss-Newton (GGN) matrix-vector product with data.
 
-    Create a GGN-mv function that computes the Generalized Gauss-Newton (GGN) matrix-
-    vector product for a given model, dataset, and loss function.
+    The GGN matrix is computed using the Jacobian of the model and the Hessian of the
+    loss function. For a given dataset, the GGN matrix-vector product is computed as:
+    $\text{factor} \sum_{i=1}^N J_i^\top H_{L, i} J_i \cdot v$
+    where $J_i$ is the Jacobian of the model for the $i$-th data point, $H_{L, i}$ is
+    the Hessian of the loss for the $i$-th data point, and $N$ is the number of data
+    points.
+
+    This function hardcodes the dataset, making it ideal for scenarios where the dataset
+    remains fixed.
 
     Args:
-        model_fn (Callable):
-            Forward pass function of the model, which takes `params` and `input` as
-            arguments.
-        params (dict):
-            Model parameters to be passed to `model_fn`.
-        data (tuple[jax.Array, jax.Array]):
-            A tuple containing the input and target data.
-        loss_fn (str | Callable):
-            Loss function to be used. Can be a string (e.g., "regression",
-            "cross_entropy") or a callable that computes the loss.
-        factor (float):
-            Factor to scale the GGN-mv by.
-        **kwargs:
-            - lmap_ggn_mv (int, optional): Chunk size for iterating over the data.
+        model_fn: The model's forward pass function.
+        params: Model parameters.
+        data: A batch of input and target data.
+        loss_fn: Loss function to use for the GGN computation.
+        factor: Scaling factor for the GGN computation.
+        **kwargs: Additional arguments, including:
+            - `lmap_ggn_mv`: Chunk size for iterating over data.
 
     Returns:
-        Callable:
-            A function that takes a vector and computes the GGN-mv for the specified
-            model
-            and dataset.
+        A function that takes a vector and computes the GGN matrix-vector product for
+        the given data.
+
+    Note: The function assumes a batch dimension.
     """
     ggn_mv = create_ggn_mv_without_data(
         model_fn=model_fn, params=params, loss_fn=loss_fn, factor=factor, **kwargs

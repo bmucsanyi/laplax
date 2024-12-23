@@ -1,14 +1,12 @@
 """Matrix-free array operations for matrix-vector products."""
 
 from collections.abc import Callable
-from functools import partial
 
 import jax
 import jax.numpy as jnp
 
 from laplax import util
 from laplax.types import Array, Layout, PyTree
-from laplax.util.flatten import unravel_array_into_pytree
 from laplax.util.ops import lmap
 from laplax.util.tree import (
     basis_vector_from_index,
@@ -18,16 +16,27 @@ from laplax.util.tree import (
 
 
 def diagonal(mv: Callable | jnp.ndarray, layout: Layout | None = None) -> Array:
-    """Return the diagonal of a PyTree-based matrix-vector-product.
+    """Compute the diagonal of a matrix represented by a matrix-vector product function.
+
+    This function extracts the diagonal of a matrix using basis vectors and a
+    matrix-vector product (MVP) function. If the input is already a dense matrix, its
+    diagonal is directly computed.
 
     Args:
-        mv (Callable | jax.Array): Matrix-vector product function.
-        layout (int | PyTree | None): Specifies the layout of the matrix:
-            - int: The size of the matrix.
-            - PyTree: The structure for generating basis vectors.
+        mv: Either:
+            - A callable that implements the MVP, or
+            - A dense matrix (jax.Array) for which the diagonal is directly extracted.
+        layout: Specifies the structure of the matrix:
+            - int: The size of the matrix (for flat MVP functions).
+            - PyTree: A structure to generate basis vectors matching the matrix
+                dimensions.
+            - None: If `mv` is a dense matrix.
 
     Returns:
-        jax.Array: Diagonal of the matrix-free matrix.
+        jax.Array: An array representing the diagonal of the matrix.
+
+    Raises:
+        TypeError: If `layout` is not provided when `mv` is a callable.
     """
     if isinstance(mv, Callable) and not isinstance(layout, Layout):
         msg = "Either size or tree needs to be present."
@@ -59,21 +68,25 @@ def diagonal(mv: Callable | jnp.ndarray, layout: Layout | None = None) -> Array:
 
 
 def todense(mv: Callable, layout: Layout, **kwargs) -> Array:
-    """Return a dense matrix representation of a matrix-vector product function.
+    """Generate a dense matrix representation from a matrix-vector product function.
+
+    Converts a matrix-vector product function into its equivalent dense matrix form
+    by applying the function to identity-like basis vectors.
 
     Args:
-        mv (Callable): Matrix-vector product function.
-        layout (dict | int | None): Specifies the structure of the mv input:
-            - int: Specifies the size of the input dimension.
-            - PyTree: Specifies the input structure for `mv`.
-            - None: Assumes default identity-like structure.
-        **kwargs: Define additional key word arguments
-            - lmap_dense: Define batch size for densing mv.
-
+        mv: A callable implementing the matrix-vector product function.
+        layout: Specifies the structure of the input:
+            - int: The size of the input dimension (flat vectors).
+            - PyTree: The structure for input to the MVP.
+            - None: Defaults to an identity-like structure.
+        **kwargs: Additional options:
+            - `lmap_dense`: Batch size for applying the MVP function.
 
     Returns:
-        jax.Array: Dense matrix representation of the input matrix-vector product
-            function.
+        jax.Array: A dense matrix representation of the MVP function.
+
+    Raises:
+        TypeError: If `layout` is neither an integer nor a PyTree structure.
     """
     # Create the identity-like basis based on `layout`
     if isinstance(layout, int):
@@ -87,26 +100,3 @@ def todense(mv: Callable, layout: Layout, **kwargs) -> Array:
     return jax.tree.map(
         jnp.transpose, lmap(mv, identity, batch_size=kwargs.get("lmap_dense", "mv"))
     )  # Lmap shares along the first axis (rows instead of columns).
-
-
-def todensetree(mv: Callable, layout: PyTree, **kwargs) -> PyTree:
-    """Return a PyTree-to-PyTree representation of a matrix-vector product function.
-
-    Args:
-        mv (Callable): Matrix-vector product function.
-        layout (PyTree): Specifies the structure of the input PyTree for `mv`.
-        **kwargs: Define additional key word arguments
-            - lmap_dense_tree: Define batch size for densing mv.
-
-    Returns:
-        PyTree: A PyTree representation of the dense matrix for the input-output
-            relationship of `mv`.
-    """
-    # Create identity-like PyTree based on the layout
-    identity = eye_like(layout)
-
-    # Apply the matrix-vector product function to the identity-like PyTree
-    mv_out = lmap(mv, identity, batch_size=kwargs.get("lmap_dense_tree", "mv"))
-
-    # Convert the output into PyTree form
-    return jax.tree.map(partial(unravel_array_into_pytree, layout, 0), mv_out)
