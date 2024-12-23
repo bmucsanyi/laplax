@@ -1,13 +1,12 @@
 """Operations for flattening PyTrees into arrays."""
 
-import functools
 import math
 from collections.abc import Generator
 
 import jax
 import jax.numpy as jnp
 
-from laplax.types import Any, Array, Callable, PyTree, PyTreeDef
+from laplax.types import Any, Array, Callable, PyTree
 from laplax.util.utils import identity
 
 # ---------------------------------------------------------------
@@ -84,81 +83,26 @@ def create_partial_pytree_flattener(
     return flatten, unflatten
 
 
-def flatten_pytree(
-    tree: PyTree,
-) -> tuple[Array, PyTreeDef, tuple[tuple[int, ...]]]:
-    """Flattens a JAX PyTree into a 1D array."""
-    leaves, tree_def = jax.tree.flatten(tree)
-    flat_array = jnp.concatenate([jnp.ravel(leaf) for leaf in leaves])
-    shapes = tuple(leaf.shape for leaf in leaves)
-
-    return flat_array, tree_def, shapes
-
-
-# def get_inflate_pytree_fn(
-#     tree_def: PyTreeDef, shapes: tuple[tuple[int, ...]]
-# ) -> Callable[[Array], PyTree]:
-#     # Convert arguments to tuples to be hashable (needed for jax.jit)
-#     sizes = tuple(math.prod(shape).item() for shape in shapes)
-#     split_indices = tuple(cumsum([0, *sizes[:-1]]).tolist())
-
-#     @partial(jax.jit, static_argnums=(1, 2, 3, 4))
-#     def inflate(
-#         flat_array: Array,
-#         tree_def: PyTreeDef,
-#         split_indices: tuple[int],
-#         sizes: tuple[int],
-#         shapes: tuple[tuple],
-#     ):
-#         leaves = []
-#         for split_ind, size, shape in zip(split_indices, sizes, shapes, strict=False):
-#             leaves.append(
-#                 jax.lax.dynamic_slice(
-#                     flat_array, (split_ind,), (size,)
-#                 ).reshape(shape)
-#             )
-#         return jax.tree.unflatten(tree_def, leaves)
-
-#     return partial(
-#         inflate,
-#         tree_def=tree_def,
-#         split_indices=split_indices,
-#         sizes=sizes,
-#         shapes=shapes,
-#     )
-
-
-def flatten_hessian(hessian_pytree: PyTree, params_pytree: PyTree) -> Array:
-    """Flatten the Hessian matrix.
+def unravel_array_into_pytree(pytree: PyTree, axis: int, arr: Array) -> PyTree:
+    """Unravel an array into a PyTree with a given structure.
 
     Args:
-        hessian_pytree: The Hessian matrix represented as a PyTree.
-        params_pytree: The parameters represented as a PyTree.
+        pytree: The pytree that provides the structure.
+        axis: The parameter axis is either -1, 0, or 1.  It controls the
+          resulting shapes.
+        example: If specified, cast the components to the matching dtype/weak_type,
+          or else use the pytree leaf type if example is None.
+        arr: The array to be unraveled.
 
-    Returns:
-        The flattened Hessian matrix.
+    Reference: Following the implementation in jax._src.api._unravel_array_into_pytree
     """
-    # Tree flatten both hessian and params
-    flatten_tree = jax.tree_util.tree_flatten(hessian_pytree)[0]
-    flatten_params = jax.tree_util.tree_flatten(params_pytree)[0]
+    leaves, treedef = jax.tree.flatten(pytree)
+    axis %= arr.ndim
+    shapes = [arr.shape[:axis] + l.shape + arr.shape[axis + 1 :] for l in leaves]
+    parts = jnp.split(arr, cumsum(math.prod(leaf.shape) for leaf in leaves[:-1]), axis)
+    reshaped_parts = [x.reshape(shape) for x, shape in zip(parts, shapes, strict=True)]
 
-    # Concatenate hessian to tree
-    n_parts = len(flatten_params)
-    full_hessian = jnp.concatenate(
-        [
-            jnp.concatenate(
-                [
-                    arr.reshape(math.prod(p.shape), -1)
-                    for arr in flatten_tree[i * n_parts : (i + 1) * n_parts]
-                ],
-                axis=1,
-            )
-            for i, p in enumerate(flatten_params)
-        ],
-        axis=0,
-    )
-
-    return full_hessian
+    return jax.tree.unflatten(treedef, reshaped_parts)
 
 
 def wrap_function(
@@ -196,56 +140,3 @@ def wrap_factory(
         return wrap_function(fn, input_fn, output_fn)
 
     return wrapped_factory
-
-
-def inflate_and_flatten(
-    flatten_fn: Callable, inflate_fn: Callable, argnums: int = 0
-) -> Callable:
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            # Convert args to list to allow modification
-            args_list = list(args)
-
-            # Flatten the input to get the tree definition and shapes
-            args_list[argnums] = inflate_fn(args[argnums])
-
-            # Call the original function with the inflated input
-            result = func(*args_list, **kwargs)
-
-            # Flatten the output
-            flat_output = flatten_fn(result)
-
-            return flat_output
-
-        return wrapper
-
-    return decorator
-
-
-def unravel_array_into_pytree(pytree: PyTree, axis: int, arr: Array) -> PyTree:
-    """Unravel an array into a PyTree with a given structure.
-
-    Args:
-        pytree: The pytree that provides the structure.
-        axis: The parameter axis is either -1, 0, or 1.  It controls the
-          resulting shapes.
-        example: If specified, cast the components to the matching dtype/weak_type,
-          or else use the pytree leaf type if example is None.
-        arr: The array to be unraveled.
-
-    Reference: Following the implementation in jax._src.api._unravel_array_into_pytree
-    """
-    leaves, treedef = jax.tree.flatten(pytree)
-    axis %= arr.ndim
-    shapes = [arr.shape[:axis] + l.shape + arr.shape[axis + 1 :] for l in leaves]
-    parts = jnp.split(arr, cumsum(math.prod(leaf.shape) for leaf in leaves[:-1]), axis)
-    reshaped_parts = [x.reshape(shape) for x, shape in zip(parts, shapes, strict=True)]
-
-    return jax.tree.unflatten(treedef, reshaped_parts)
-
-
-def flatten_pytree_to_array(tree: PyTree) -> Array:
-    """Flatten a PyTree into a 1D array."""
-    flat, _ = jax.tree.flatten(tree)
-    return jnp.concatenate([x.ravel() for x in flat])
