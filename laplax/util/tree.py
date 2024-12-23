@@ -8,7 +8,7 @@ from itertools import starmap
 import jax
 import jax.numpy as jnp
 
-from laplax.types import Any, Array, Float, KeyType, PyTree
+from laplax.types import Any, Array, Callable, Float, KeyType, PyTree
 from laplax.util.flatten import unravel_array_into_pytree
 from laplax.util.ops import lmap
 
@@ -20,99 +20,6 @@ from laplax.util.ops import lmap
 def get_size(tree: PyTree) -> PyTree:
     flat, _ = jax.tree_util.tree_flatten(tree)
     return sum(math.prod(arr.shape) for arr in flat)
-
-
-# ---------------------------------------------------------------
-# Create common arrays in given tree structure
-# ---------------------------------------------------------------
-
-
-def ones_like(tree: PyTree) -> PyTree:
-    return jax.tree.map(jnp.ones_like, tree)
-
-
-def zeros_like(tree: PyTree) -> PyTree:
-    return jax.tree.map(jnp.zeros_like, tree)
-
-
-def randn_like(key: KeyType, tree: PyTree) -> PyTree:
-    """Generates a White Noise PyTree in the form of given PyTree.
-
-    Args:
-        key : PRNGKey,
-        tree: A PyTree of arrays, whose structure and shape will be used.
-
-    Returns:
-        (PyTree) : A PyTree of random numbers with the same structure
-            and shape as `pytree`.
-    """
-    # Flatten the tree
-    leaves, treedef = jax.tree.flatten(tree)
-
-    # Split key
-    keys = jax.random.split(key, len(leaves))
-
-    # Generate random numbers
-    random_leaves = [
-        jax.random.normal(k, shape=leaf.shape)
-        for k, leaf in zip(keys, leaves, strict=True)
-    ]
-
-    return jax.tree.unflatten(treedef, random_leaves)
-
-
-def basis_vector_from_index(idx: int, tree: PyTree) -> PyTree:
-    # Create a tree of zeros with the same structure
-    zeros = zeros_like(tree)
-
-    # Flatten the tree to get a list of arrays and the tree definition
-    flat, tree_def = jax.tree_util.tree_flatten(zeros)
-
-    # Compute the cumulative sizes of each array in the flat structure
-    sizes = jnp.array([math.prod(arr.shape) for arr in flat])
-
-    # Find the index of the array containing the idx
-    cum_sizes = jnp.cumsum(sizes)
-    k = jnp.searchsorted(cum_sizes, idx, side="right")
-
-    # Compute the adjusted index within the identified array
-    idx_corr = idx - jnp.where(k > 0, cum_sizes[k - 1], 0)
-
-    # Define a function to update the k-th array with the basis vector
-    def update_array(i, arr):
-        return jax.lax.cond(
-            i == k,
-            lambda: arr.flatten().at[idx_corr].set(1.0).reshape(arr.shape),
-            lambda: arr,
-        )
-
-    # Map the update function across the flattened list of arrays
-    updated_flat = list(starmap(update_array, enumerate(flat)))
-
-    # Reconstruct the tree with the updated flat structure
-    return jax.tree_util.tree_unflatten(tree_def, updated_flat)
-
-
-def eye_like_with_basis_vector(tree: PyTree) -> PyTree:
-    n_ele = get_size(tree)
-    return lmap(partial(basis_vector_from_index, tree=tree), jnp.arange(n_ele))
-
-
-def eye_like(tree: PyTree) -> PyTree:
-    return unravel_array_into_pytree(tree, 1, jnp.eye(get_size(tree)))
-
-
-def tree_slice(tree: PyTree, a: int, b: int) -> PyTree:
-    return jax.tree.map(operator.itemgetter(slice(a, b)), tree)
-
-
-def tree_vec_get(tree: PyTree, idx: int) -> Any:
-    if isinstance(tree, jnp.ndarray):
-        return tree[idx]  # Also works with arrays.
-    # Column flat and get index
-    flat, _ = jax.tree_util.tree_flatten(tree)
-    flat = jnp.concatenate([f.reshape(-1) for f in flat])
-    return flat[idx]
 
 
 # ---------------------------------------------------------------
@@ -188,6 +95,107 @@ def tree_matvec(tree: PyTree, vector: Array) -> PyTree:
 
 def tree_partialmatvec(tree: PyTree, vector: Array) -> PyTree:
     return jax.tree.map(lambda arr: arr @ vector, tree)
+
+
+# ---------------------------------------------------------------
+# Create common arrays in given tree structure
+# ---------------------------------------------------------------
+
+
+def ones_like(tree: PyTree) -> PyTree:
+    return jax.tree.map(jnp.ones_like, tree)
+
+
+def zeros_like(tree: PyTree) -> PyTree:
+    return jax.tree.map(jnp.zeros_like, tree)
+
+
+def randn_like(key: KeyType, tree: PyTree) -> PyTree:
+    """Generates a White Noise PyTree in the form of given PyTree.
+
+    Args:
+        key : PRNGKey,
+        tree: A PyTree of arrays, whose structure and shape will be used.
+
+    Returns:
+        (PyTree) : A PyTree of random numbers with the same structure
+            and shape as `pytree`.
+    """
+    # Flatten the tree
+    leaves, treedef = jax.tree.flatten(tree)
+
+    # Split key
+    keys = jax.random.split(key, len(leaves))
+
+    # Generate random numbers
+    random_leaves = [
+        jax.random.normal(k, shape=leaf.shape)
+        for k, leaf in zip(keys, leaves, strict=True)
+    ]
+
+    return jax.tree.unflatten(treedef, random_leaves)
+
+
+def normal_like(
+    key: KeyType,
+    mean: PyTree,
+    scale_mv: Callable[[PyTree], PyTree],
+) -> PyTree:
+    return add(mean, scale_mv(randn_like(key, mean)))
+
+
+def basis_vector_from_index(idx: int, tree: PyTree) -> PyTree:
+    # Create a tree of zeros with the same structure
+    zeros = zeros_like(tree)
+
+    # Flatten the tree to get a list of arrays and the tree definition
+    flat, tree_def = jax.tree_util.tree_flatten(zeros)
+
+    # Compute the cumulative sizes of each array in the flat structure
+    sizes = jnp.array([math.prod(arr.shape) for arr in flat])
+
+    # Find the index of the array containing the idx
+    cum_sizes = jnp.cumsum(sizes)
+    k = jnp.searchsorted(cum_sizes, idx, side="right")
+
+    # Compute the adjusted index within the identified array
+    idx_corr = idx - jnp.where(k > 0, cum_sizes[k - 1], 0)
+
+    # Define a function to update the k-th array with the basis vector
+    def update_array(i, arr):
+        return jax.lax.cond(
+            i == k,
+            lambda: arr.flatten().at[idx_corr].set(1.0).reshape(arr.shape),
+            lambda: arr,
+        )
+
+    # Map the update function across the flattened list of arrays
+    updated_flat = list(starmap(update_array, enumerate(flat)))
+
+    # Reconstruct the tree with the updated flat structure
+    return jax.tree_util.tree_unflatten(tree_def, updated_flat)
+
+
+def eye_like_with_basis_vector(tree: PyTree) -> PyTree:
+    n_ele = get_size(tree)
+    return lmap(partial(basis_vector_from_index, tree=tree), jnp.arange(n_ele))
+
+
+def eye_like(tree: PyTree) -> PyTree:
+    return unravel_array_into_pytree(tree, 1, jnp.eye(get_size(tree)))
+
+
+def tree_slice(tree: PyTree, a: int, b: int) -> PyTree:
+    return jax.tree.map(operator.itemgetter(slice(a, b)), tree)
+
+
+def tree_vec_get(tree: PyTree, idx: int) -> Any:
+    if isinstance(tree, jnp.ndarray):
+        return tree[idx]  # Also works with arrays.
+    # Column flat and get index
+    flat, _ = jax.tree_util.tree_flatten(tree)
+    flat = jnp.concatenate([f.reshape(-1) for f in flat])
+    return flat[idx]
 
 
 # ---------------------------------------------------------------

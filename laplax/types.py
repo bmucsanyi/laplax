@@ -28,3 +28,13 @@ Data = dict[str, Num[Array, "..."]]  # {"input": ..., "target": ...}
 Layout = PyTree | int
 PriorArguments = dict[str, Array]
 PosteriorState = PyTree[Num[Array, "..."]]
+
+# Pushforward types
+DistState = dict[str, ...]  # type: ignore  # noqa: PGH003
+# This contains the following types:
+# - Posterior
+# - int
+# - JVPType: Callable[[InputArray, Params], PredArray]
+# - VJPType: Callable[[InputArray, PredArray], Params]
+# - Callable[[int], Params]
+# - None
