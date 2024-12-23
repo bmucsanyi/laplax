@@ -49,9 +49,8 @@ def concatenate_model_and_loss_fn(
     the batch dimension using `jax.vmap`.
 
     Mathematically, the combined function computes:
-    $$L(x, y, \theta) = \text{loss}(f(x, \theta), y)$$
-    where $f$ is the model function, $\theta$ are the model parameters, $x$ is the
-    input, and $y$ is the target.
+    $L(x, y, \theta) = \text{loss}(f(x, \theta), y)$, where $f$ is the model function,
+    $\theta$ are the model parameters, $x$ is the input, and $y$ is the target.
 
     Args:
         model_fn: The model function to evaluate.
@@ -113,10 +112,8 @@ def create_hessian_mv_without_data(
     single callable. It evaluates the Hessian at the provided model parameters, with
     respect to the model and loss function.
 
-    Mathematically:
-    $$H \cdot v = \nabla^2 L(x, y, \theta) \cdot v$$
-    where $L$ is the combined loss function, $\theta$ are the parameters, and $v$ is the
-    input vector.
+    Mathematically: $H \cdot v = \nabla^2 L(x, y, \theta) \cdot v$, where $L$ is the
+    combined loss function, $\theta$ are the parameters, and $v$ is the input vector.
 
     Args:
         model_fn: The model function to evaluate.
@@ -171,10 +168,9 @@ def create_hessian_mv(
     This function wraps `create_hessian_mv_without_data`, fixing the dataset to produce
     a function that computes the HVP for the specified data.
 
-    Mathematically:
-    $$ H \cdot v = \nabla^2 L(x, y, \theta) \cdot v $$
-    where $L$ is the combined loss function, $\theta$ are the parameters, and $v$ is the
-    input vector of the HVP.
+    Mathematically: $H \cdot v = \nabla^2 L(x, y, \theta) \cdot v$, where $L$ is the
+    combined loss function, $\theta$ are the parameters, and $v$ is the input vector of
+    the HVP.
 
     Args:
         model_fn: The model function to evaluate.

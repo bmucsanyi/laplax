@@ -84,9 +84,8 @@ def get_low_rank_approximation(
 
     Mathematically, the low-rank approximation seeks to find the leading eigenpairs
     $(\lambda_i, u_i)$ such that:
-    $$ A u_i = \lambda_i u_i \quad \text{for } i = 1, \ldots, k, $$
-    where $A$ is the matrix represented by the matrix-vector product `mv`, and $k$ is
-    the number of eigenpairs.
+    $A u_i = \lambda_i u_i \quad \text{for } i = 1, \ldots, k$, where $A$ is the matrix
+    represented by the matrix-vector product `mv`, and $k$ is the number of eigenpairs.
 
     Args:
         mv: A callable that computes the matrix-vector product, representing the matrix

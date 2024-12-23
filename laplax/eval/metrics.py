@@ -189,9 +189,7 @@ def estimate_q(
     variance.
 
     Mathematically:
-    $$
-    q = \frac{1}{n} \sum_{i=1}^n \frac{(y_i - \hat{y}_i)^2}{\sigma_i^2}
-    $$
+    $q = \frac{1}{n} \sum_{i=1}^n \frac{(y_i - \hat{y}_i)^2}{\sigma_i^2}$.
 
     Args:
         pred_mean: Array of predicted means.
@@ -210,9 +208,7 @@ def estimate_rmse(pred_mean: Array, target: Array, **kwargs) -> Float:
     r"""Estimate the root mean squared error (RMSE) for predictions.
 
     Mathematically:
-    $$
-    \text{RMSE} = \sqrt{\frac{1}{n} \sum_{i=1}^n (y_i - \hat{y}_i)^2}
-    $$
+    $\text{RMSE} = \sqrt{\frac{1}{n} \sum_{i=1}^n (y_i - \hat{y}_i)^2}$.
 
     Args:
         pred_mean: Array of predicted means.
@@ -259,10 +255,8 @@ def nll_gaussian(
     (standard deviation).
 
     Mathematically:
-    $$
-    \text{NLL} = - \sum_{i=1}^n \log \left( \frac{1}{\sqrt{2\pi \sigma_i^2}}
-    \exp \left( -\frac{(y_i - \hat{y}_i)^2}{2\sigma_i^2} \right) \right)
-    $$
+    $\text{NLL} = - \sum_{i=1}^n \log \left( \frac{1}{\sqrt{2\pi \sigma_i^2}}
+    \exp \left( -\frac{(y_i - \hat{y}_i)^2}{2\sigma_i^2} \right) \right)$.
 
     Args:
         pred: Array of predicted means for the dataset.

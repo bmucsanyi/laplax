@@ -35,9 +35,7 @@ def _cross_entropy_hessian_mv(
     between the diagonal contribution and the off-diagonal contribution of the Hessian.
 
     Mathematically, the Hessian-vector product is computed as:
-    $$
-    H \cdot jv = \text{diag}(p) \cdot jv - p \cdot (p^\top \cdot jv)
-    $$
+    $H \cdot jv = \text{diag}(p) \cdot jv - p \cdot (p^\top \cdot jv), $ s
     where $p = \text{softmax}(\text{pred})$.
 
     Args:
@@ -63,9 +61,7 @@ def _mse_hessian_mv(jv: PredArray, **kwargs) -> PredArray:
     input vector.
 
     Mathematically:
-    $$
-    H \cdot jv = 2 \cdot jv
-    $$
+    $H \cdot jv = 2 \cdot jv$.
 
     Args:
         jv: Vector to multiply with the Hessian.
@@ -138,7 +134,7 @@ def create_ggn_mv_without_data(
 
     The GGN matrix is computed using the Jacobian of the model and the Hessian of the
     loss function. The resulting product is given by:
-    $$ \text{factor} \cdot \sum_i J_i^\top H_{L, i} J_i \cdot v $$
+    $\text{factor} \cdot \sum_i J_i^\top H_{L, i} J_i \cdot v$
     where $J_i$ is the Jacobian of the model at data point $i$, $H_{L, i}$ is the
     Hessian of the loss, and $v$ is the vector.
 
@@ -223,9 +219,7 @@ def create_ggn_mv(
 
     The GGN matrix is computed using the Jacobian of the model and the Hessian of the
     loss function. For a given dataset, the GGN matrix-vector product is computed as:
-    $$
-    \text{factor} \sum_{i=1}^N J_i^\top H_{L, i} J_i \cdot v
-    $$
+    $\text{factor} \sum_{i=1}^N J_i^\top H_{L, i} J_i \cdot v$
     where $J_i$ is the Jacobian of the model for the $i$-th data point, $H_{L, i}$ is
     the Hessian of the loss for the $i$-th data point, and $N$ is the number of data
     points.

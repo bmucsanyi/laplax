@@ -94,7 +94,7 @@ def evaluate_on_dataset(
 
     Returns:
         dict: A dictionary containing predictions and target labels for the
-        entire dataset.
+            entire dataset.
     """
 
     def evaluate_data_point(dp: Data) -> dict[str, Array]:

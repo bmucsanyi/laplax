@@ -5,21 +5,46 @@
 This essentially denses the curvature matrix-vector product to a full array and uses it as the covariance precision for creating the weight space posterior covariance.
 
 ::: laplax.curv.cov.create_full_curvature
-    options:
-      show_root_heading: true
-      show_source: true
-      members_order: source
 
+::: laplax.curv.cov.full_with_prior
+
+::: laplax.curv.cov.full_prec_to_state
+
+::: laplax.curv.cov.full_state_to_scale
+
+::: laplax.curv.cov.full_state_to_cov
+
+### Diagonal
+
+The diagonal approximation represents the curvature matrix using only its diagonal elements, providing a computationally efficient but simplified representation of the curvature information.
+
+::: laplax.curv.cov.create_diagonal_curvature
+
+::: laplax.curv.cov.diag_with_prior
+
+::: laplax.curv.cov.diag_prec_to_state
+
+::: laplax.curv.cov.diag_state_to_scale
+
+::: laplax.curv.cov.diag_state_to_cov
 
 ### Low Rank Approximations
 
 Tools for computing efficient low-rank approximations of curvature matrices.
 
 ::: laplax.curv.low_rank.get_low_rank_approximation
-    options:
-      show_root_heading: true
-      show_source: true
-      members_order: source
+
+::: laplax.curv.cov.create_low_rank_curvature
+
+::: laplax.curv.cov.create_low_rank_mv
+
+::: laplax.curv.cov.low_rank_with_prior
+
+::: laplax.curv.cov.low_rank_prec_to_state
+
+::: laplax.curv.cov.low_rank_state_to_scale
+
+::: laplax.curv.cov.low_rank_state_to_cov
 
 
 A mixed-precision implementation of the LOBPCG algorithm for eigenvalue computation.
