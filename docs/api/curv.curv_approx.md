@@ -1,8 +1,9 @@
 # Curvature Approximations
 
-### Full approximation
+### Exact Representation
 
-This essentially denses the curvature matrix-vector product to a full array and uses it as the covariance precision for creating the weight space posterior covariance.
+Provides the dense representation of the curvature matrix-vector product.
+It is used for creating the weight space posterior covariance without further approximations.
 
 ::: laplax.curv.cov.create_full_curvature
 
@@ -30,7 +31,7 @@ The diagonal approximation represents the curvature matrix using only its diagon
 
 ### Low Rank Approximations
 
-Tools for computing efficient low-rank approximations of curvature matrices.
+Provides an efficient low-rank approximation of curvature matrices.
 
 ::: laplax.curv.low_rank.get_low_rank_approximation
 

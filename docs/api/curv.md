@@ -1,24 +1,24 @@
 # Curvature Module
 
-The curvature module provides implementations for various curvature approximations and matrix-vector products used in Laplace approximation.
+The curvature module provides implementations for various curvature approximations and matrix-vector products used in Laplace approximations.
 
 ## Overview
 
 
 ### Curvatures
-Currently supported curvatures are the:
+Currently supported curvatures:
 
-- **GGN (Generalized Gauss-Newton)**: Efficient matrix-vector products for neural networks
-- **HVP (Hessian)**: Efficient matrix-vector products for neural networks weight Hessian.
+- **GGNVP (Generalized Gauss-Newton):** Efficient matrix-vector products for neural network Generalized Gauss-Newton (GGN) matrices.
+- **HVP (Hessian):**: Matrix-vector products for neural network loss Hessians.
 
-Both aim to support a data batch or a data loader.
+Both of these curvatures support a mini-batch of data or a data loader.
 
 ### Curvature approximations
-Currently the following curvature approximations and posterior derviations are supported:
+Currently, the following approximations and corresponding weight posteriors are supported for any of the curvatures:
 
-- **Full** Full representation of the matrix
-- **Diagonal** Diagonal approximation of any curvature structure.
-- **Low Rank** Low-rank approximation of any curvature structure.
+- **Full:** Exact representation of the curvature.
+- **Diagonal:** Diagonal approximation of the curvature.
+- **Low Rank** Low-rank approximation of the curvature.
 
 Each method leads to a corresponding weight space covariance matrix-vector product. Additional curvature can be easily registered to have the same pipeline available.
 
