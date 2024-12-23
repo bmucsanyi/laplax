@@ -1,6 +1,7 @@
 """Full hessian estimation."""
 
 import jax
+import jax.numpy as jnp
 
 from laplax.enums import LossFn
 from laplax.types import (
@@ -35,7 +36,7 @@ def concatenate_model_and_loss_fn(
         def loss_wrapper(
             input: InputArray, target: TargetArray, params: Params
         ) -> Num[Array, "..."]:
-            return (model_fn(input, params) - target) ** 2
+            return jnp.sum((model_fn(input, params) - target) ** 2)
 
         return loss_wrapper
 

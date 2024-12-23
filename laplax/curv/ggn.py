@@ -134,6 +134,9 @@ def create_ggn_mv_without_data(
         Callable:
             A function that takes a vector and a batch of data, then computes the GGN-mv
             for the specified model and loss function.
+
+    Note:
+        Function assumes that data has a batch dimension.
     """
 
     def _jvp_fn(
