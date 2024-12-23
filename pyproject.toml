@@ -45,7 +45,8 @@ dev = [
     "matplotlib",
 ]
 notebooks = [
-    "tensorflow",
+    "torch",
+    "torchvision",
     "optax",
     "flax",
 ]

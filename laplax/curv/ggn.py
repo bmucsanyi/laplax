@@ -75,7 +75,7 @@ def _mse_hessian_mv(jv: PredArray, **kwargs) -> PredArray:
 
 
 def create_loss_hessian_mv(
-    loss_fn: LossFn | Callable[[PredArray, TargetArray], Num[Array, "..."]],
+    loss_fn: LossFn | str | Callable[[PredArray, TargetArray], Num[Array, "..."]],
 ) -> Callable:
     r"""Create a function to compute the Hessian-vector product for a specified loss fn.
 
@@ -126,7 +126,7 @@ def create_loss_hessian_mv(
 def create_ggn_mv_without_data(
     model_fn: ModelFn,
     params: Params,
-    loss_fn: LossFn | Callable,
+    loss_fn: LossFn | str | Callable,
     factor: Float = 1.0,
     **kwargs,
 ) -> Callable[[Params, Data], Params]:
@@ -211,7 +211,7 @@ def create_ggn_mv(
     model_fn: ModelFn,
     params: Params,
     data: Data,
-    loss_fn: LossFn | Callable,
+    loss_fn: LossFn | str | Callable,
     factor: Float = 1.0,
     **kwargs,
 ) -> Callable[[Params], Params]:

@@ -1,6 +1,6 @@
 """All types defined in one place."""
 
-from collections.abc import Callable, Iterable  # noqa: F401
+from collections.abc import Callable, Iterable, Mapping  # noqa: F401
 from typing import Any  # noqa: F401
 
 import jax
@@ -24,9 +24,9 @@ ModelFn = Callable[..., PredArray]  # [InputArray, Params]
 CurvatureMV = Callable[[Params], Params]
 
 # Data structures
-Data = dict[str, Num[Array, "..."]]  # {"input": ..., "target": ...}
+Data = Mapping[str, Num[Array, "..."]]  # {"input": ..., "target": ...}
 Layout = PyTree | int
-PriorArguments = dict[str, Array]
+PriorArguments = Mapping[str, Array | float]
 PosteriorState = PyTree[Num[Array, "..."]]
 
 # Pushforward types
