@@ -89,6 +89,12 @@ def lobpcg_standard(
       a_dtype: dtype for A calls (e.g., float64 for stable matrix-vector products)
       A_jittable: Then pass the computation to
             `jax.experimental.sparse.linalg.lobpcg_standard`.
+
+    Returns:
+        Tuple containing:
+            - Eigenvalues: Array of shape (k,)
+            - Eigenvectors: Array of shape (n, k)
+            - Iterations: Number of iterations performed
     """
     if A_jittable:
         return linalg.lobpcg_standard(A, X, m, tol)

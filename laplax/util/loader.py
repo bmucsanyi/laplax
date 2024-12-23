@@ -14,6 +14,17 @@ from laplax.util.tree import add
 
 
 def input_target_split(batch: tuple[Array, Array]) -> Data:
+    """Split a batch into input and target components.
+
+    Args:
+        batch: A tuple where the first element is the input data and the second
+            element is the target data.
+
+    Returns:
+        A dictionary containing:
+            - "input": Input data from the batch.
+            - "target": Target data from the batch.
+    """
     return {"input": batch[0], "target": batch[1]}
 
 
@@ -25,7 +36,17 @@ def input_target_split(batch: tuple[Array, Array]) -> Data:
 def reduce_add(
     res_new: Any, state: Any | None = None, *, keepdims: bool = True, axis: int = 0
 ) -> tuple[Any, Any]:
-    """Add reduction with accumulated sum in state."""
+    """Perform a reduction by summing results across a specified axis.
+
+    Args:
+        res_new: The new result to add to the current state.
+        state: The current accumulated state (default: None).
+        keepdims: Whether to keep reduced dimensions (default: True).
+        axis: The axis along which to sum (default: 0).
+
+    Returns:
+        The updated state and the new accumulated sum.
+    """
     summed = jax.tree.map(lambda x: jnp.sum(x, keepdims=keepdims, axis=axis), res_new)
     if state is None:
         return summed, summed
@@ -34,6 +55,16 @@ def reduce_add(
 
 
 def concat(tree1: PyTree, tree2: PyTree, axis: int = 0) -> PyTree:
+    """Concatenate two PyTrees along a specified axis.
+
+    Args:
+        tree1: The first PyTree to concatenate.
+        tree2: The second PyTree to concatenate.
+        axis: The axis along which to concatenate (default: 0).
+
+    Returns:
+        A PyTree resulting from concatenating `tree1` and `tree2`.
+    """
     return jax.tree.map(
         lambda x, y: jax.numpy.concatenate([x, y], axis=axis), tree1, tree2
     )
@@ -42,7 +73,16 @@ def concat(tree1: PyTree, tree2: PyTree, axis: int = 0) -> PyTree:
 def reduce_concat(
     res_new: Any, state: Any | None = None, *, axis: int = 0
 ) -> tuple[Any, Any]:
-    """Concatenate with accumulated results in state."""
+    """Perform a reduction by concatenating results.
+
+    Args:
+        res_new: The new result to concatenate with the current state.
+        state: The current accumulated state (default: None).
+        axis: The axis along which to concatenate (default: 0).
+
+    Returns:
+        The updated state and the concatenated result.
+    """
     if state is None:
         return res_new, res_new
     new_state = concat(state, res_new, axis=axis)
@@ -50,7 +90,15 @@ def reduce_concat(
 
 
 def reduce_online_mean(res_new: Any, state: tuple | None = None) -> tuple[Any, tuple]:
-    """Online mean with (count, running_sum) as state to avoid storing means."""
+    """Compute the online mean of results, maintaining a running count and sum.
+
+    Args:
+        res_new: The new result to incorporate into the mean calculation.
+        state: A tuple containing the current count and running sum (default: None).
+
+    Returns:
+        The updated mean and the new state (count, running sum).
+    """
     batch_size = jax.tree.map(lambda x: x.shape[0] if x.ndim > 0 else 1, res_new)
     batch_sum = jax.tree.map(
         lambda x: jnp.sum(x, axis=0) if x.ndim > 0 else jnp.sum(x),
@@ -85,7 +133,22 @@ def process_batches(
     *args,
     **kwargs,
 ) -> Any:
-    """Core batch processing logic shared between wrapper implementations."""
+    """Process batches of data using a function, transformation, and reduction.
+
+    Args:
+        function: A callable that processes a single batch of data.
+        data_loader: An iterable yielding batches of data.
+        transform: A callable that transforms each batch into the desired format.
+        reduce: A callable that reduces results across batches.
+        *args: Additional positional arguments for the processing function.
+        **kwargs: Additional keyword arguments for the processing function.
+
+    Returns:
+        Any: The final result after processing all batches.
+
+    Raises:
+        ValueError: If the data loader is empty.
+    """
     state = None
     result = None
     for batch in data_loader:
@@ -111,7 +174,21 @@ def execute_with_data_loader(
     jit: bool = False,
     **kwargs,
 ) -> Any:
-    """Direct execution of batch processing."""
+    """Execute batch processing with a data loader.
+
+    Args:
+        function: A callable that processes a single batch of data.
+        data_loader: An iterable yielding batches of data.
+        transform: A callable to transform each batch into the desired format
+            (default: `input_target_split`).
+        reduce: A callable to reduce results across batches
+            (default: `reduce_online_mean`).
+        jit: Whether to JIT compile the processing function (default: False).
+        **kwargs: Additional keyword arguments for the processing function.
+
+    Returns:
+        Any: The final result after processing all batches.
+    """
     fn = jax.jit(function) if jit else function
     return process_batches(fn, data_loader, transform, reduce, **kwargs)
 
@@ -124,7 +201,23 @@ def wrap_function_with_data_loader(
     *,
     jit: bool = False,
 ) -> Callable:
-    """Returns a function that processes batches."""
+    """Wrap a function to process batches with a data loader.
+
+    This wrapper generates a callable that processes all batches from the data loader
+    using the specified function, transformation, and reduction.
+
+    Args:
+        function: A callable that processes a single batch of data.
+        data_loader: An iterable yielding batches of data.
+        transform: A callable to transform each batch into the desired format
+            (default: `input_target_split`).
+        reduce: A callable to reduce results across batches
+            (default: `reduce_online_mean`).
+        jit: Whether to JIT compile the processing function (default: False).
+
+    Returns:
+        Callable: A wrapped function for batch processing.
+    """
     fn = jax.jit(function) if jit else function
 
     def wrapped(*args, **kwargs):

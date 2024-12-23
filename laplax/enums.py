@@ -1,3 +1,5 @@
+"""Enums for Laplace approximations."""
+
 from enum import StrEnum
 
 
