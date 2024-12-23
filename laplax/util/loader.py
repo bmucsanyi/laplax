@@ -26,7 +26,7 @@ def reduce_add(
     res_new: Any, state: Any | None = None, *, keepdims: bool = True, axis: int = 0
 ) -> tuple[Any, Any]:
     """Add reduction with accumulated sum in state."""
-    summed = jax.tree_map(lambda x: jnp.sum(x, keepdims=keepdims, axis=axis), res_new)
+    summed = jax.tree.map(lambda x: jnp.sum(x, keepdims=keepdims, axis=axis), res_new)
     if state is None:
         return summed, summed
     new_state = add(state, summed)
@@ -51,23 +51,23 @@ def reduce_concat(
 
 def reduce_online_mean(res_new: Any, state: tuple | None = None) -> tuple[Any, tuple]:
     """Online mean with (count, running_sum) as state to avoid storing means."""
-    batch_size = jax.tree_map(lambda x: x.shape[0] if x.ndim > 0 else 1, res_new)
-    batch_sum = jax.tree_map(
+    batch_size = jax.tree.map(lambda x: x.shape[0] if x.ndim > 0 else 1, res_new)
+    batch_sum = jax.tree.map(
         lambda x: jnp.sum(x, axis=0) if x.ndim > 0 else jnp.sum(x),
         res_new,
     )
 
     if state is None:
-        return jax.tree_map(operator.truediv, batch_sum, batch_size), (
+        return jax.tree.map(operator.truediv, batch_sum, batch_size), (
             batch_size,
             batch_sum,
         )
 
     old_count, old_sum = state
-    total_count = jax.tree_map(operator.add, old_count, batch_size)
+    total_count = jax.tree.map(operator.add, old_count, batch_size)
     new_sum = add(old_sum, batch_sum)
 
-    current_mean = jax.tree_map(operator.truediv, new_sum, total_count)
+    current_mean = jax.tree.map(operator.truediv, new_sum, total_count)
 
     return current_mean, (total_count, new_sum)
 
