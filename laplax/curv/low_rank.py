@@ -35,9 +35,9 @@ class LowRankTerms:
         scalar: The scalar factor.
     """
 
-    U: Num[Array, "P R"]  # noqa: F722
-    S: Num[Array, "R"]  # noqa: F821
-    scalar: Float[Array, ""]  # noqa: F722
+    U: Num[Array, "P R"]
+    S: Num[Array, " R"]
+    scalar: Float[Array, ""]
 
 
 jax.tree_util.register_pytree_node(

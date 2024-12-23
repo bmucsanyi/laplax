@@ -35,7 +35,7 @@ from laplax.util.mv import diagonal, todense
 
 def create_full_curvature(
     mv: CurvatureMV, layout: Layout, **kwargs
-) -> Num[Array, "P P"]:  # noqa: F722
+) -> Num[Array, "P P"]:
     """Generate a full curvature approximation."""
     del kwargs
     curv_est = todense(mv, layout=layout)
@@ -44,14 +44,14 @@ def create_full_curvature(
 
 
 def full_with_prior(
-    curv_est: Num[Array, "P P"],  # noqa: F722
+    curv_est: Num[Array, "P P"],
     prior_arguments: PriorArguments,
-) -> Num[Array, "P P"]:  # noqa: F722
+) -> Num[Array, "P P"]:
     prior_prec = prior_arguments["prior_prec"]
     return curv_est + prior_prec * jnp.eye(curv_est.shape[-1])
 
 
-def prec_to_scale(prec: Num[Array, "P P"]) -> Num[Array, "P P"]:  # noqa: F722
+def prec_to_scale(prec: Num[Array, "P P"]) -> Num[Array, "P P"]:
     """Implementation of the corresponding torch function.
 
     See: torch.distributions.multivariate_normal._precision_to_scale_tril.
@@ -69,15 +69,15 @@ def prec_to_scale(prec: Num[Array, "P P"]) -> Num[Array, "P P"]:  # noqa: F722
 
 
 def full_prec_to_state(
-    prec: Num[Array, "P P"],  # noqa: F722
-) -> dict[str, Num[Array, "P P"]]:  # noqa: F722
+    prec: Num[Array, "P P"],
+) -> dict[str, Num[Array, "P P"]]:
     scale = prec_to_scale(prec)
 
     return {"scale": scale}
 
 
 def full_state_to_scale(
-    state: dict[str, Num[Array, "P P"]],  # noqa: F722
+    state: dict[str, Num[Array, "P P"]],
 ) -> Callable[[FlatParams], FlatParams]:
     def scale_mv(vec: FlatParams) -> FlatParams:
         return state["scale"] @ vec
@@ -86,7 +86,7 @@ def full_state_to_scale(
 
 
 def full_state_to_cov(
-    state: dict[str, Num[Array, "P P"]],  # noqa: F722
+    state: dict[str, Num[Array, "P P"]],
 ) -> Callable[[FlatParams], FlatParams]:
     cov = state["scale"] @ state["scale"].T
 
